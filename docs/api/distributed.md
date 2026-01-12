@@ -3,6 +3,6 @@
 ## Collectives API
 
 ```{eval-rst}
-.. automodule:: nkipy.distributed.collectives
+.. automodule:: nkipy.core.ops.collectives
    :members:
 ```

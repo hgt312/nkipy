@@ -2,8 +2,8 @@ import os
 import sys
 
 project = "NKIPy"
-copyright = "2025, Amazon.com"
-author = "AWS Team (Ziyang Xu et al.)"
+copyright = "2026, Amazon.com"
+author = "NKIPy Team (Ziyang Xu et al.)"
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -20,7 +20,7 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "sphinx_book_theme"
-html_static_path = ["_static"]
+# html_static_path = ["_static"]
 
 
 sys.path.insert(0, os.path.abspath("../nkipy/"))

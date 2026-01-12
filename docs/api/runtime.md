@@ -1,15 +1,22 @@
 # Runtime APIs
 
-## Spike
+## Low Level Spike APIs
 
 ```{eval-rst}
-.. automodule:: spike
+.. automodule:: spike._spike
    :members:
 ```
 
-## Executor
+## DeviceKernel
 
 ```{eval-rst}
-.. autoclass:: nkipy.runtime.BaremetalExecutor
+.. autoclass:: nkipy.runtime.DeviceKernel
+   :members:
+```
+
+## DeviceTensor
+
+```{eval-rst}
+.. autoclass:: nkipy.runtime.DeviceTensor
    :members:
 ```

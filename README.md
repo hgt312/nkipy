@@ -58,28 +58,34 @@ cd nkipy
 
 # Install all packages in editable mode
 uv sync
+
+# For additional features (examples, docs, testing):
+uv sync --all-groups
 ```
 
 This will:
 - Create a `.venv` virtual environment
 - Install `nkipy`, `spike`, and all dependencies (including `neuronx-cc` from the Neuron repository)
-- Install development tools (pytest, ruff, mypy)
+
+The `--all-groups` flag additionally installs:
+- **test**: pytest, ruff, mypy for testing and linting
+- **examples**: torch, transformers, ipython for running examples
+- **docs**: sphinx and related tools for building documentation
 
 ### Running Commands
 
+**Note:** Activate the environment with `source .venv/bin/activate`, or use `uv run python your_script.py` to run without activation.
+
 ```bash
 # Run Python with the workspace environment
-uv run python -c "import nkipy; import spike"
+source .venv/bin/activate
+python -c "import nkipy; import spike"
 
 # Run a small NKIPy kernel
-uv run python examples/playground/simple_nkipy_kernel.py 
+python examples/playground/simple_nkipy_kernel.py 
 ```
 
-### Alternative: pip Installation
-
-If you prefer pip, see the [Installation Guide](./docs/installation.md) for detailed instructions.
-
-## Building Wheels
+### Building Wheels
 
 To build distribution wheels:
 
@@ -92,6 +98,67 @@ uv build --package spike
 ```
 
 Wheels will be created in the `dist/` directory.
+
+### Alternative: pip Installation
+
+If you prefer pip, see the [Installation Guide](./docs/installation.md) for detailed instructions.
+
+## Basic Usage
+
+NKIPy kernels look like NumPy functions and can run in three modes.
+
+### 1. Pure NumPy (CPU)
+
+Write and run kernels directly as NumPy code:
+
+```python
+import numpy as np
+
+def softmax_kernel(x):
+    exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
+    sum_x = np.sum(exp_x, axis=-1, keepdims=True)
+    return exp_x / sum_x
+
+# Run on CPU with NumPy
+x = np.random.rand(2, 128).astype(np.float32)
+result = softmax_kernel(x)
+```
+
+### 2. Simulation Mode
+
+Use the `@simulate_jit` decorator to trace and simulate execution:
+
+```python
+from nkipy.runtime import simulate_jit
+
+@simulate_jit
+def softmax_kernel(x):
+    exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
+    sum_x = np.sum(exp_x, axis=-1, keepdims=True)
+    return exp_x / sum_x
+
+# Automatically traced and simulated
+result = softmax_kernel(x)
+```
+
+### 3. Trainium Hardware
+
+Use the `@baremetal_jit` decorator to compile and run on Trainium:
+
+```python
+from nkipy.runtime import baremetal_jit
+
+@baremetal_jit
+def softmax_kernel(x):
+    exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
+    sum_x = np.sum(exp_x, axis=-1, keepdims=True)
+    return exp_x / sum_x
+
+# Compiled and executed on Trainium hardware
+result = softmax_kernel(x)
+```
+
+The `@baremetal_jit` decorator compiles the kernel and executes it on Trainium hardware.
 
 ## Documentation
 

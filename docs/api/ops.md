@@ -19,6 +19,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 - [Linear Algebra Operations](#linear-algebra-operations)
 - [Collective Operations](#collective-operations)
 
+(binary-operations)=
 ## Binary Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -43,6 +44,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `power` | hlo | `np.power` |
 | `subtract` | hlo | `np.subtract` |
 
+(indexing-operations)=
 ## Indexing Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -55,6 +57,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `take_along_axis` | hlo | `np.take_along_axis` |
 | `where` | hlo | `np.where` |
 
+(reduction-operations)=
 ## Reduction Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -65,6 +68,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `min` | hlo | `np.min` |
 | `sum` | hlo | `np.sum` |
 
+(creation-operations)=
 ## Creation Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -76,6 +80,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `zeros` | cpu, hlo | — |
 | `zeros_like` | cpu, hlo | `np.zeros_like` |
 
+(neural-network-operations)=
 ## Neural Network Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -84,6 +89,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `softmax` | — | — |
 | `topk` | cpu, hlo | — |
 
+(transform-operations)=
 ## Transform Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -99,6 +105,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `split` | hlo | `np.split` |
 | `transpose` | hlo | `np.transpose` |
 
+(unary-operations)=
 ## Unary Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -123,6 +130,7 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `tanh` | hlo | `np.tanh` |
 | `trunc` | hlo | `np.trunc` |
 
+(convolution-operations)=
 ## Convolution Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
@@ -130,12 +138,14 @@ NKIPy operations are traced and lowered to HLO for compilation by the Neuron Com
 | `conv2d` | cpu, hlo | — |
 | `conv3d` | cpu, hlo | — |
 
+(linear-algebra-operations)=
 ## Linear Algebra Operations
 
 | Operation | Backend(s) | NumPy Equivalent |
 |-----------|-----------|------------------|
 | `matmul` | hlo | `np.matmul` |
 
+(collective-operations)=
 ## Collective Operations
 
 | Operation | Backend(s) | NumPy Equivalent |

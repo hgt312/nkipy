@@ -198,6 +198,9 @@ def generate_ops_reference() -> str:
 
     # Generate each category section
     for category, ops in categories.items():
+        # Add MyST target for cross-references
+        anchor = category.lower().replace(" ", "-")
+        lines.append(f"({anchor})=")
         lines.append(f"## {category}")
         lines.append("")
         lines.append("| Operation | Backend(s) | NumPy Equivalent |")
@@ -404,10 +407,10 @@ def update_index() -> str:
 ```{toctree}
 :maxdepth: 2
 
-core
 ops
 numpy_compat
 distributed
+core
 runtime
 ```
 """

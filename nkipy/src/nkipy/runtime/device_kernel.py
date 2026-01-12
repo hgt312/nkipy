@@ -60,7 +60,7 @@ class DeviceKernel(SpikeModel):
             use_cached_if_exists: If True, use cached neff if it exists.
             build_dir: Overriding the build directory for the kernel
             target: Compilation target for the kernel
-            *args, **kwargs: Arguments for specialization (numpy array or DeviceTensor)
+            \*args, \*\*kwargs: Arguments for specialization (numpy array or DeviceTensor)
 
         Returns:
             DeviceKernel: A DeviceKernel instance with the compiled kernel

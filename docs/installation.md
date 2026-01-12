@@ -40,6 +40,22 @@ This single command will:
 
 ### Running Commands
 
+You can run commands in two ways:
+
+**Option 1: Activate the virtual environment**
+```bash
+# Activate the environment
+source .venv/bin/activate
+
+# Now run commands directly
+python examples/playground/simple_nkipy_kernel.py
+python -c "import nkipy; import spike"
+
+# Deactivate when done
+deactivate
+```
+
+**Option 2: Use `uv run` without activation**
 ```bash
 # Run Python with the workspace environment
 uv run python examples/playground/simple_nkipy_kernel.py 

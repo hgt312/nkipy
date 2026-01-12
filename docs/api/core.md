@@ -7,13 +7,6 @@
    :members:
 ```
 
-## Tensor APIs
-
-```{eval-rst}
-.. automodule:: nkipy.core.tensor_apis
-    :members:
-```
-
 ## Compile APIs
 
 ```{eval-rst}
