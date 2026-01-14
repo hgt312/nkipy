@@ -44,6 +44,14 @@ Spike provides a modern, efficient Python interface to AWS Neuron Runtime (NRT) 
 
 ## Installation
 
+### Prerequisites
+
+NKIPy requires a Trainium instance with the Neuron Driver and Runtime installed.
+
+If you are using a **Neuron Multi-Framework DLAMI**, the driver and runtime are already installed. You can skip to the next section.
+
+Otherwise, follow the [Neuron Setup Guide](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/setup/torch-neuronx.html#setup-torch-neuronx) up to the "**Install Drivers and Tools**" section for your OS. Note that NKIPy does not require PyTorch, but it supports Torch tensors if available.
+
 ### Quick Start with uv (Recommended)
 
 [uv](https://docs.astral.sh/uv/) is a fast Python package manager that handles dependencies and virtual environments automatically.
