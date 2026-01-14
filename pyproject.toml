@@ -5,7 +5,7 @@ name = "nkipy-workspace"
 version = "0.1.0"
 description = "NKIPy Monorepo - A lightweight Pythonic kernel environment for AWS Neuron"
 requires-python = ">=3.10"
-dependencies = ["nkipy", "spike"]
+dependencies = ["nkipy"]
 
 [tool.uv.workspace]
 members = ["nkipy", "spike"]
@@ -20,6 +20,7 @@ spike = { workspace = true }
 nkipy = { workspace = true }
 
 [dependency-groups]
+dev = ["spike"]
 test = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
