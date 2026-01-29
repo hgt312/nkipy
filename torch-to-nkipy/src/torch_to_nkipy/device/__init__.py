@@ -9,10 +9,10 @@ from pathlib import Path
 
 import torch
 
-from .. import _C
-from ..backend.nkipy_backend_config import get_nkipy_backend_config
-from ..utils.ntff_meta import NtffMeta
-from . import device_module, distributed_backend  # noqa: F401
+from torch_to_nkipy import _C
+from torch_to_nkipy.backend.nkipy_backend_config import get_nkipy_backend_config
+from torch_to_nkipy.device import device_module, distributed_backend  # noqa: F401
+from torch_to_nkipy.utils.ntff_meta import NtffMeta
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,7 @@ def nrt_execute_model(model, inputs, outputs):
     # Destroy tensor sets
     _C._nrt_destroy_tensor_set(input_set)
     _C._nrt_destroy_tensor_set(output_set)
+
 
 def nrt_profile_start(model, ntff_file):
     _C._nrt_profile_start(model, ntff_file)

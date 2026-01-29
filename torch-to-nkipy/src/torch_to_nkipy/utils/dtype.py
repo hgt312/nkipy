@@ -6,10 +6,9 @@ from typing import Any, List, Tuple, Union
 
 import numpy as np
 import torch
-from nkipy.core.language import bfloat16
 from neuronxcc.nki.language import float8_e5m2
-
-from .name import NUMPY_PKG
+from nkipy.core.language import bfloat16
+from torch_to_nkipy.utils.name import NUMPY_PKG
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +181,7 @@ def numpy_to_tensor(array: Any) -> torch.Tensor:
 
 
 def convert_numpy_arrays_to_tensors(
-    data: Union[np.ndarray, np.generic, List[Any], Tuple[Any, ...], None]
+    data: Union[np.ndarray, np.generic, List[Any], Tuple[Any, ...], None],
 ) -> Union[torch.Tensor, List[Any], Tuple[Any, ...], None]:
     """
     Convert NumPy arrays, scalars, or nested structures to PyTorch tensors.

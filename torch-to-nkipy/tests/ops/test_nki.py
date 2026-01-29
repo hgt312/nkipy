@@ -1,14 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from base import NKIPyTestBase
-
-import neuronxcc.nki.language as nl
-import pytest
-import torch
-import neuronxcc.nki.typing as nt
 from typing import Tuple
 
+import neuronxcc.nki.language as nl
+import neuronxcc.nki.typing as nt
+import pytest
+import torch
+from base import NKIPyTestBase
 from torch_to_nkipy import NKIOpRegistry
 
 # Simple matrix add kernel for testing
@@ -94,8 +93,9 @@ def nki_add_with_grid_with_kwarg(
 def _(a: torch.Tensor, b: torch.Tensor, bias: float, add_bias: bool) -> torch.Tensor:
     return torch.empty_like(a)
 
+
 # Version 4: with IO aliasing
-@NKIOpRegistry.register("mylib::add_custom_op_io_alias", alias_map={0:0})
+@NKIOpRegistry.register("mylib::add_custom_op_io_alias", alias_map={0: 0})
 def nki_tensor_add_kernel_io_alias(a_input: nt.mutable_tensor, b_input):
     ix = nl.arange(128)[:, None]
     iy = nl.arange(512)[None, :]
@@ -115,8 +115,9 @@ def nki_add_io_alias(a_input: torch.Tensor, b_input: torch.Tensor) -> torch.Tens
 def _(a_input: torch.Tensor, b_input: torch.Tensor) -> torch.Tensor:
     return torch.empty_like(a_input)
 
+
 # Version 5: more IO aliasing
-@NKIOpRegistry.register("mylib::more_io_alias", alias_map={0:0, 1:1})
+@NKIOpRegistry.register("mylib::more_io_alias", alias_map={0: 0, 1: 1})
 def nki_kernel_more_io_alias(a_input: nt.mutable_tensor, b_input: nt.mutable_tensor):
     ix = nl.arange(128)[:, None]
     iy = nl.arange(512)[None, :]
@@ -131,13 +132,22 @@ def nki_kernel_more_io_alias(a_input: nt.mutable_tensor, b_input: nt.mutable_ten
 
 
 @torch.library.custom_op("mylib::more_io_alias", mutates_args=())
-def nki_more_alias(a_input: torch.Tensor, b_input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def nki_more_alias(
+    a_input: torch.Tensor, b_input: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     return nki_kernel_more_io_alias(a_input, b_input)
 
 
 @nki_more_alias.register_fake
-def _(a_input: torch.Tensor, b_input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    return torch.empty_like(a_input), torch.empty_like(a_input), torch.empty_like(a_input)
+def _(
+    a_input: torch.Tensor, b_input: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    return (
+        torch.empty_like(a_input),
+        torch.empty_like(a_input),
+        torch.empty_like(a_input),
+    )
+
 
 class TestNki(NKIPyTestBase):
     @pytest.mark.parametrize("shape", [(128, 512)])
@@ -203,9 +213,7 @@ class TestNki(NKIPyTestBase):
             test_func, (arg_0, arg_1, arg_2), cpu_ref_func=cpu_ref_func
         )
 
-    @pytest.mark.parametrize(
-        "shape", [(128, 512)]
-    )
+    @pytest.mark.parametrize("shape", [(128, 512)])
     def test_nki_io_alias(self, shape):
         def test_func(a, b):
             # a is updated in-place, after running the function a = a + b
@@ -220,13 +228,9 @@ class TestNki(NKIPyTestBase):
             res = a + b + b
             return res
 
-        self.run_test_on_device(
-            test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func
-        )
+        self.run_test_on_device(test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func)
 
-    @pytest.mark.parametrize(
-        "shape", [(128, 512)]
-    )
+    @pytest.mark.parametrize("shape", [(128, 512)])
     def test_nki_io_alias2(self, shape):
         def test_func(a, b):
             # a and b is updated in-place
@@ -241,14 +245,9 @@ class TestNki(NKIPyTestBase):
             res = a + b
             return res
 
-        self.run_test_on_device(
-            test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func
-        )
+        self.run_test_on_device(test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func)
 
-
-    @pytest.mark.parametrize(
-        "shape", [(128, 512)]
-    )
+    @pytest.mark.parametrize("shape", [(128, 512)])
     def test_nki_io_alias_direct_return(self, shape):
         def test_func(a, b):
             a = nki_add_io_alias(a, b)
@@ -261,9 +260,7 @@ class TestNki(NKIPyTestBase):
             res = a + b
             return res
 
-        self.run_test_on_device(
-            test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func
-        )
+        self.run_test_on_device(test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func)
 
     def test_nki_kernel_caching(self):
         def test_func(a, b, c):

@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+
 
 @AtenOpRegistry.register("torch.ops.aten.relu.default")
 def relu_default(node: fx.Node, computation_node: ComputationNode) -> None:

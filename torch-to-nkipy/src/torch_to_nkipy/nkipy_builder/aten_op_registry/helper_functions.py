@@ -4,9 +4,8 @@
 from typing import Callable
 
 import torch.fx as fx
-
-from ...utils.name import NUMPY_PKG
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+from torch_to_nkipy.utils.name import NUMPY_PKG
 
 
 def _normalize_scalar_constant(value):
@@ -67,4 +66,3 @@ def _create_comparison_handler(
         )
 
     return handler
-

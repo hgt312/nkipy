@@ -3,10 +3,12 @@
 
 import torch
 import torch.fx as fx
-from .base import AtenOpRegistry
-from .helper_functions import _create_comparison_handler
-from ..nkipy_ast import ComputationNode
-from ...utils.graph import get_dtype_from_fx_node
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.aten_op_registry.helper_functions import (
+    _create_comparison_handler,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+from torch_to_nkipy.utils.graph import get_dtype_from_fx_node
 
 # Register basic element-wise operations
 # Use the batch registration utility for simple mappings
@@ -102,6 +104,7 @@ def _register_bitwise_binary(aten_name: str, numpy_bitwise: str, numpy_logical: 
         )
 
     return _handler
+
 
 _register_bitwise_binary(
     "torch.ops.aten.bitwise_and.Tensor", "bitwise_and", "logical_and"

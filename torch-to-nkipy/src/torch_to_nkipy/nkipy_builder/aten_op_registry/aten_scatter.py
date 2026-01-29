@@ -2,9 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from .helper_functions import _normalize_scalar_constant
-from ..nkipy_ast import ComputationNode, CodeGenerator
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.aten_op_registry.helper_functions import (
+    _normalize_scalar_constant,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import CodeGenerator, ComputationNode
+
 
 @AtenOpRegistry.register("torch.ops.aten.scatter.value")
 def scatter_value(node: fx.Node, computation_node: ComputationNode) -> None:

@@ -23,10 +23,10 @@ def get_platform_target(compiler_args=None) -> str:
             compiler_args = compiler_args.split()
         index = compiler_args.index("--target")
         target = compiler_args[index + 1]
-        assert (
-            target in SUPPORTED_TYPES
-        ), f"{target} is not a supported platform. \
+        assert target in SUPPORTED_TYPES, (
+            f"{target} is not a supported platform. \
         Please choose from options trn1, trn1n, or trn2."
+        )
         return CompilationTarget.TRN1 if "trn1" in target else CompilationTarget.TRN2
 
     fpath = "/sys/devices/virtual/dmi/id/product_name"

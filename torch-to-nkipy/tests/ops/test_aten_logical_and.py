@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from base import NKIPyTestBase
-
 import pytest
 import torch
+from base import NKIPyTestBase
 
 
 class TestAtenLogicalAnd(NKIPyTestBase):
@@ -17,7 +16,7 @@ class TestAtenLogicalAnd(NKIPyTestBase):
             ((1, 1, 1), torch.bool),  # Singleton dimensions
             ((16,), torch.bool),  # 1D tensor
             # FIXME compiler error
-            #((128, 256), torch.float32),  # Floating point tensor
+            # ((128, 256), torch.float32),  # Floating point tensor
         ],
     )
     def test_logical_and_shapes_dtypes(self, shape, dtype):

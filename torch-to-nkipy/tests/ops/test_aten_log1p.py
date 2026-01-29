@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import math
-from base import NKIPyTestBase
 
 import pytest
 import torch
+from base import NKIPyTestBase
 
 
 class TestAtenLog1p(NKIPyTestBase):
@@ -82,12 +82,15 @@ class TestAtenLog1p(NKIPyTestBase):
         self.run_test_on_host(test_func, (edge_values,))
         self.run_test_on_device(test_func, (edge_values,))
 
-    @pytest.mark.parametrize("dtype", [
-        torch.float32,
-        torch.float16,
-        # FIXME accuqracy issue
-        # torch.bfloat16
-    ])
+    @pytest.mark.parametrize(
+        "dtype",
+        [
+            torch.float32,
+            torch.float16,
+            # FIXME accuqracy issue
+            # torch.bfloat16
+        ],
+    )
     def test_log1p_precision(self, dtype):
         """Test log1p.default precision for small values where log1p shines."""
 

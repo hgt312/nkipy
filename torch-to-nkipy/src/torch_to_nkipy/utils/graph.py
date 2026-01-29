@@ -19,10 +19,7 @@ from torch.fx import GraphModule, Node
 from torch.fx.graph import dtype_abbrs
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.split_module import split_module
-
-from ..runtime.runtime import get_nkipy_backend_config
-
-from ..utils import ops  # noqa
+from torch_to_nkipy.utils import ops  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +55,9 @@ def hash_gm_with_tensors(
             compiler_version_str = str(neuronxcc.__version__)
         except ModuleNotFoundError:
             raise ModuleNotFoundError("Neuronxcc is not properly installed!")
+        # Import here to avoid circular import
+        from torch_to_nkipy.runtime.runtime import get_nkipy_backend_config
+
         compiler_args_str = get_nkipy_backend_config().additional_compiler_args
         compiler_version_args_str = compiler_version_str + compiler_args_str
 
@@ -710,9 +710,9 @@ def move_inplace_copies(gm: GraphModule) -> GraphModule:
     for n in list(g.nodes):  # snapshot since we'll mutate order
         if n.op == "call_function" and n.target is torch.ops.aten.copy_.default:
             dst, src = n.args[:2]
-            assert isinstance(src, Node) and isinstance(
-                dst, Node
-            ), "copy_ args must be Nodes"
+            assert isinstance(src, Node) and isinstance(dst, Node), (
+                "copy_ args must be Nodes"
+            )
             src.append(n)
             changed = True
 

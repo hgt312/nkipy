@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+
 
 @AtenOpRegistry.register("torch.ops.aten._softmax.default")
 def _softmax_default(node: fx.Node, computation_node: ComputationNode) -> None:

@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from base import NKIPyTestBase
-
 import pytest
 import torch
+from base import NKIPyTestBase
 
 
 class TestAtenIndex(NKIPyTestBase):
@@ -22,7 +21,7 @@ class TestAtenIndex(NKIPyTestBase):
                 [(torch.tensor([0, 1]), slice(None))],
                 torch.float32,
             ),  # Tensor indexing
-            # ((128, 256), [(slice(None), torch.tensor([0, 1]))], torch.float16),  # FP16
+            # ((128, 256), [(slice(None), torch.tensor([0, 1]))], torch.float16),
             # ((64, 128), [(None, slice(None))], torch.bfloat16),  # With None
             # ((16,), [(slice(0, 10),)], torch.float32),  # 1D slicing
         ],

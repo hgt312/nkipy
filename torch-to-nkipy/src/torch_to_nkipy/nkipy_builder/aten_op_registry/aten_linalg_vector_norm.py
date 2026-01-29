@@ -2,10 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from ..nkipy_ast import ComputationNode, CodeGenerator
-from ...utils.dtype import torch_to_numpy_dtype_str
-from ...utils.graph import get_shape_from_fx_node
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import CodeGenerator, ComputationNode
+from torch_to_nkipy.utils.dtype import torch_to_numpy_dtype_str
+from torch_to_nkipy.utils.graph import get_shape_from_fx_node
+
 
 @AtenOpRegistry.register("torch.ops.aten.linalg_vector_norm.default")
 def linalg_vector_norm_default(

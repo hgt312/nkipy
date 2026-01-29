@@ -9,7 +9,6 @@ import torch.fx as fx
 from torch._decomp import core_aten_decompositions
 from torch._functorch.aot_autograd import aot_module_simplified
 from torch._inductor.utils import InputType
-
 from torch_to_nkipy.nkipy_builder.nkipy_kernel import NKIPyKernel
 
 

@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode
-from ...utils.graph import get_shape_from_fx_node
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+from torch_to_nkipy.utils.graph import get_shape_from_fx_node
+
 
 @AtenOpRegistry.register("torch.ops.aten.index_put.default")
 def index_put_default(node: fx.Node, computation_node: ComputationNode) -> None:

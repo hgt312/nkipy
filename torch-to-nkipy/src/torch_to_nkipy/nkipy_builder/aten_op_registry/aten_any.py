@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+
 
 @AtenOpRegistry.register("torch.ops.aten.any.default")
 def any_default(node: fx.Node, computation_node: ComputationNode) -> None:
@@ -17,6 +21,7 @@ def any_default(node: fx.Node, computation_node: ComputationNode) -> None:
         func_name="any",
         args=[x],
     )
+
 
 # FIXME The numpy.any has not been implemented in NKIPy yet
 # we use a workaround solution for now
@@ -118,4 +123,3 @@ def any_dim(node: fx.Node, computation_node: ComputationNode) -> None:
     ast_block.add_numpy_call_assignment(
         target=node.name, func_name="not_equal", args=[tmp_sum, "0"]
     )
-

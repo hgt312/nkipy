@@ -12,7 +12,7 @@ from torch._C._distributed_c10d import (
     ScatterOptions,
 )
 
-from .. import _C
+from torch_to_nkipy import _C
 
 
 def neuron_barrier(device_id, global_device_id, global_device_count):

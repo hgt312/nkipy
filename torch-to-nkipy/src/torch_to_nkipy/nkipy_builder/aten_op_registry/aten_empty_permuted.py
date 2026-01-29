@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from ..nkipy_ast import ComputationNode, CodeGenerator
-from ...utils.dtype import torch_to_numpy_dtype_str
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import CodeGenerator, ComputationNode
+from torch_to_nkipy.utils.dtype import torch_to_numpy_dtype_str
 
 
 @AtenOpRegistry.register("torch.ops.aten.empty_permuted.default")

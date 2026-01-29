@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from base import NKIPyTestBase
-
 import pytest
 import torch
+from base import NKIPyTestBase
 
 
 class TestAtenGeScalar(NKIPyTestBase):
@@ -15,8 +14,8 @@ class TestAtenGeScalar(NKIPyTestBase):
             ((8, 16), 1.0, torch.float32),
             ((4, 8, 16), -1.0, torch.float32),
             # FIXME Compiler errors
-            #((128,), 0.5, torch.float16),
-            #((64, 1), -0.5, torch.bfloat16),
+            # ((128,), 0.5, torch.float16),
+            # ((64, 1), -0.5, torch.bfloat16),
             ((1,), float("inf"), torch.float32),
             ((2, 2), -float("inf"), torch.float32),
         ],

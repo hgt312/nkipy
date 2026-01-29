@@ -1,17 +1,18 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-""" Utilities for registering custom NKI operators """
+"""Utilities for registering custom NKI operators"""
+
+import logging
 from typing import Callable, Dict, List, Set
 
 import torch
 import torch.fx as fx
-import logging
 from torch._subclasses.fake_tensor import unset_fake_temporarily
 
 
 class NKIKernelWrapper:
-    """Wrapper around NKI kernel to preserve launch grid and compiler args. """
+    """Wrapper around NKI kernel to preserve launch grid and compiler args."""
 
     def __init__(self, func, compiler_args="", alias_map={}):
         self.func = func
@@ -43,20 +44,28 @@ class NKIOpRegistry:
 
     @classmethod
     def canonicalize_custom_op_name(cls, custom_op_name: str) -> str:
-        legit_custom_op_name = f'torch.ops.{custom_op_name.replace("::", ".")}.default'
+        legit_custom_op_name = f"torch.ops.{custom_op_name.replace('::', '.')}.default"
         return legit_custom_op_name
 
     @classmethod
-    def register(cls, custom_op_name: str, compiler_args: str = "", alias_map={}) -> NKIKernelWrapper:
+    def register(
+        cls, custom_op_name: str, compiler_args: str = "", alias_map={}
+    ) -> NKIKernelWrapper:
         legit_custom_op_name = cls.canonicalize_custom_op_name(custom_op_name)
-        assert (
-            legit_custom_op_name not in cls._nki_name_map
-        ), f"{custom_op_name} is already registered in NKI op registry!"
+        assert legit_custom_op_name not in cls._nki_name_map, (
+            f"{custom_op_name} is already registered in NKI op registry!"
+        )
 
         if len(alias_map) > 0:
-            logging.warning("CUSTOM NKI OP WITH IO ALIASING IS FRAGILE, USE AT YOUR OWN RISK. ")
-            logging.warning("CUSTOM NKI OP WITH IO ALIASING IS FRAGILE, USE AT YOUR OWN RISK. ")
-            logging.warning("CUSTOM NKI OP WITH IO ALIASING IS FRAGILE, USE AT YOUR OWN RISK. ")
+            logging.warning(
+                "CUSTOM NKI OP WITH IO ALIASING IS FRAGILE, USE AT YOUR OWN RISK. "
+            )
+            logging.warning(
+                "CUSTOM NKI OP WITH IO ALIASING IS FRAGILE, USE AT YOUR OWN RISK. "
+            )
+            logging.warning(
+                "CUSTOM NKI OP WITH IO ALIASING IS FRAGILE, USE AT YOUR OWN RISK. "
+            )
 
         def actual_decorator(nki_kernel_func: Callable):
             wrapped_kernel = NKIKernelWrapper(nki_kernel_func, compiler_args, alias_map)
@@ -79,9 +88,9 @@ class NKIOpRegistry:
         legit_custom_op_name = custom_op_name
         if canonicalize:
             legit_custom_op_name = cls.canonicalize_custom_op_name(custom_op_name)
-        assert cls.is_registered(
-            legit_custom_op_name, canonicalize=False
-        ), f"Custom op {custom_op_name} is not registered in NKi op registry!"
+        assert cls.is_registered(legit_custom_op_name, canonicalize=False), (
+            f"Custom op {custom_op_name} is not registered in NKi op registry!"
+        )
         return cls._nki_name_map[legit_custom_op_name]
 
     @classmethod
@@ -115,5 +124,7 @@ def populate_grid(op: Callable, args: List) -> None:
 
 
 # Generate a hash str for a NKI kernel given its name, arguments, and launch grid
-def get_nki_kernel_hash(name: str, args_str: str, grid_str: str, compiler_args: str = "") -> str:
+def get_nki_kernel_hash(
+    name: str, args_str: str, grid_str: str, compiler_args: str = ""
+) -> str:
     return str(hash(name + args_str + grid_str + compiler_args)).replace("-", "_")

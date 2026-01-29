@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from .helper_functions import _normalize_scalar_constant
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.aten_op_registry.helper_functions import (
+    _normalize_scalar_constant,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+
 
 @AtenOpRegistry.register("torch.ops.aten.full_like.default")
 def full_like_default(node: fx.Node, computation_node: ComputationNode) -> None:

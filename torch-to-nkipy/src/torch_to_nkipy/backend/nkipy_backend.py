@@ -18,17 +18,16 @@ from torch._dynamo.backends.registry import register_backend
 from torch._functorch._aot_autograd.utils import make_boxed_func
 from torch._functorch.aot_autograd import aot_module_simplified
 from torch._inductor.utils import InputType
-
-from ..device import nrt_close, nrt_init
-from ..nkipy_builder.nkipy_kernel import NKIPyKernel
-from ..utils.graph import _count_subgraph_markers as count_subgraph_markers
-from ..utils.graph import gm_split_and_wrap
-from .nkipy_backend_config import (
+from torch_to_nkipy.backend.nkipy_backend_config import (
     NKIPyBackendConfig,
     get_nkipy_backend_config,
     reset_nkipy_backend_config,
     set_nkipy_backend_config,
 )
+from torch_to_nkipy.device import nrt_close, nrt_init
+from torch_to_nkipy.nkipy_builder.nkipy_kernel import NKIPyKernel
+from torch_to_nkipy.utils.graph import _count_subgraph_markers as count_subgraph_markers
+from torch_to_nkipy.utils.graph import gm_split_and_wrap
 
 # FIXME replace the AliasOfInputHandler in aot_module_simplified
 runtime_wrappers.AliasOfInputHandler.__call__ = (

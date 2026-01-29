@@ -4,9 +4,10 @@
 import torch.fx as fx
 from torch._C._distributed_c10d import _resolve_process_group
 from torch.distributed.distributed_c10d import get_process_group_ranks
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode, CodeGenerator
-from ...utils.name import CC_PKG, NUMPY_PKG
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import CodeGenerator, ComputationNode
+from torch_to_nkipy.utils.name import CC_PKG, NUMPY_PKG
+
 
 @AtenOpRegistry.register("torch.ops._c10d_functional.all_reduce.default")
 def all_reduce_default(node: fx.Node, computation_node: ComputationNode) -> None:

@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .. import _C
+from torch_to_nkipy import _C
 
 current_device_idx = 0
 

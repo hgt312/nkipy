@@ -13,11 +13,15 @@ from nkipy.core.language import bfloat16
 from torch._inductor.utils import InputType
 from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
-
-from ..utils.graph import save_string_to_file, stringify_fx_node
-from ..utils.name import NKIPY_DEBUG_FUNC_NAME, NKIPY_FUNC_NAME
-from .aten_op_registry import AtenOpRegistry
-from .nkipy_ast import ComputationNode, InputNode, NKIPyAST, OutputNode
+from torch_to_nkipy.nkipy_builder.aten_op_registry import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import (
+    ComputationNode,
+    InputNode,
+    NKIPyAST,
+    OutputNode,
+)
+from torch_to_nkipy.utils.graph import save_string_to_file, stringify_fx_node
+from torch_to_nkipy.utils.name import NKIPY_DEBUG_FUNC_NAME, NKIPY_FUNC_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +118,7 @@ class NKIPyBuilder:
         ]
 
         # Generate NKIPy function code
-        nkipy_raw_code = self.nkipy_func_ast.generate_function_code(
-            NKIPY_FUNC_NAME
-        )
+        nkipy_raw_code = self.nkipy_func_ast.generate_function_code(NKIPY_FUNC_NAME)
 
         # Generate modified FX graph module code
         gm_raw_code = self.gm.code

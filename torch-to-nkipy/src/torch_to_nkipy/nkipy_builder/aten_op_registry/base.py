@@ -6,10 +6,9 @@ import logging
 from typing import Callable, Dict, List, Optional
 
 import torch.fx as fx
-
-from ...utils.graph import stringify_fx_node
-from ...utils.nki import NKIOpRegistry
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+from torch_to_nkipy.utils.graph import stringify_fx_node
+from torch_to_nkipy.utils.nki import NKIOpRegistry
 
 logger = logging.getLogger(__name__)
 

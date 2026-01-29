@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode
-from ...utils.graph import get_dtype_from_fx_node, get_shape_from_fx_node
-from ...utils.name import NUMPY_PKG
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+from torch_to_nkipy.utils.graph import get_dtype_from_fx_node, get_shape_from_fx_node
+from torch_to_nkipy.utils.name import NUMPY_PKG
 
 
 @AtenOpRegistry.register("torch.ops.aten.where.self")

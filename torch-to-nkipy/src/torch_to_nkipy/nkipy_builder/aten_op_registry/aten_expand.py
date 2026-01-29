@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode
-from ...utils.graph import resolve_shape_placeholder_expand
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+from torch_to_nkipy.utils.graph import resolve_shape_placeholder_expand
 
 
 @AtenOpRegistry.register("torch.ops.aten.expand.default")

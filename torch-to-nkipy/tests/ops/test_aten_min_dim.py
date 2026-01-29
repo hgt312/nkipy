@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from base import NKIPyTestBase
-
 import pytest
 import torch
+from base import NKIPyTestBase
 
 
 class TestAtenMinDim(NKIPyTestBase):
@@ -90,11 +89,12 @@ class TestAtenMinDim(NKIPyTestBase):
 
     @pytest.mark.parametrize(
         "dtype",
-        [torch.float32,
-         torch.float16,
-         # FIXME accuracy issue
-         #torch.bfloat16
-         ],
+        [
+            torch.float32,
+            torch.float16,
+            # FIXME accuracy issue
+            # torch.bfloat16
+        ],
     )
     def test_min_dim_identical_values(self, dtype):
         """Test min.dim behavior when all values along dimension are identical."""
@@ -140,10 +140,11 @@ class TestAtenMinDim(NKIPyTestBase):
 
     @pytest.mark.parametrize(
         "dtype",
-        [torch.float32,
-         torch.float16,
-         # FIXME accuracy issue
-         #torch.bfloat16
+        [
+            torch.float32,
+            torch.float16,
+            # FIXME accuracy issue
+            # torch.bfloat16
         ],
     )
     def test_min_dim_numerical_stability(self, dtype):

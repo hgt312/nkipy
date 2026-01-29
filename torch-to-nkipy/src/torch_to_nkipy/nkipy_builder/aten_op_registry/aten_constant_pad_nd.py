@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode, CodeGenerator
-from ...utils.dtype import torch_to_numpy_dtype_str
-from ...utils.graph import get_shape_from_fx_node
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import CodeGenerator, ComputationNode
+from torch_to_nkipy.utils.dtype import torch_to_numpy_dtype_str
+from torch_to_nkipy.utils.graph import get_shape_from_fx_node
+
 
 @AtenOpRegistry.register("torch.ops.aten.constant_pad_nd.default")
 def constant_pad_nd_default(node: fx.Node, computation_node: ComputationNode) -> None:
@@ -42,11 +43,12 @@ def constant_pad_nd_default(node: fx.Node, computation_node: ComputationNode) ->
         target_shape[input_dim - dim - 1] = (
             input_shape[input_dim - dim - 1] + total_pad_size_dim
         )
-        slicing_indices.append(
-            ""
-            if total_pad_size_dim == 0
-            else f"{pad_sizes[dim*2]}:{pad_sizes[dim*2]+input_shape[input_dim-dim-1]}"
-        )
+        if total_pad_size_dim == 0:
+            slicing_indices.append("")
+        else:
+            start = pad_sizes[dim * 2]
+            end = start + input_shape[input_dim - dim - 1]
+            slicing_indices.append(f"{start}:{end}")
     slicing_indices.reverse()
 
     # Create constant tensor

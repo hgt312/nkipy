@@ -9,10 +9,11 @@ import pytest
 # Skip all tests in this folder if torch_to_nkipy cannot be imported
 try:
     from torch_to_nkipy import (
+        get_nkipy_backend_config,
         init_nkipy_backend,
         is_nkipy_backend_initialized,
-        get_nkipy_backend_config,
     )
+
     TORCH_TO_NKIPY_AVAILABLE = True
 except ImportError:
     TORCH_TO_NKIPY_AVAILABLE = False
@@ -25,6 +26,7 @@ if not TORCH_TO_NKIPY_AVAILABLE:
 
 
 if TORCH_TO_NKIPY_AVAILABLE:
+
     @pytest.fixture(scope="package", autouse=True)
     def package_setup_and_cleanup():
         if not is_nkipy_backend_initialized():

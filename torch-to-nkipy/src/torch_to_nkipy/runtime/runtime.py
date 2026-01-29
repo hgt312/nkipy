@@ -26,12 +26,11 @@ from typing import Callable, Dict, List, Tuple, Union
 import numpy as np
 import torch
 from nkipy.core.compile import compile_to_neff, trace
-
-from ..backend.nkipy_backend_config import get_nkipy_backend_config
-from ..device import nrt_execute_model, nrt_load_model, nrt_profile
-from ..utils.dtype import meta_tensor_to_numpy, numpy_to_torch_dtype
-from ..utils.graph import load_func_from_file
-from ..utils.name import (
+from torch_to_nkipy.backend.nkipy_backend_config import get_nkipy_backend_config
+from torch_to_nkipy.device import nrt_execute_model, nrt_load_model, nrt_profile
+from torch_to_nkipy.utils.dtype import meta_tensor_to_numpy, numpy_to_torch_dtype
+from torch_to_nkipy.utils.graph import load_func_from_file
+from torch_to_nkipy.utils.name import (
     ARG_SHAPE_DTYPE_FILE,
     COMPILER_DIR,
     IO_SPECS_FILE,
@@ -39,8 +38,8 @@ from ..utils.name import (
     NKIPY_FUNC_FILE,
     NKIPY_FUNC_NAME,
 )
-from ..utils.ntff_meta import NtffMeta
-from ..utils.target import get_platform_target
+from torch_to_nkipy.utils.ntff_meta import NtffMeta
+from torch_to_nkipy.utils.target import get_platform_target
 
 logger = logging.getLogger(__name__)
 
@@ -350,9 +349,9 @@ def parallel_compile_model(
         return
 
     # Get parallel workers
-    assert (
-        num_workers > 0
-    ), f"Must have a valid number of parallel workers, getting {num_workers}!"
+    assert num_workers > 0, (
+        f"Must have a valid number of parallel workers, getting {num_workers}!"
+    )
 
     # Compile
     logger.info(

@@ -2,16 +2,21 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import ast
+
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from ..nkipy_ast import ComputationNode, CodeGenerator
-from ...utils.dtype import torch_to_numpy_dtype_str
-from ...utils.name import NUMPY_PKG
-from ...utils.nki import (
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import CodeGenerator, ComputationNode
+from torch_to_nkipy.utils.dtype import torch_to_numpy_dtype_str
+from torch_to_nkipy.utils.name import NUMPY_PKG
+from torch_to_nkipy.utils.nki import (
     NKIOpRegistry,
     get_nki_kernel_hash,
     populate_grid,
 )
+
 
 @AtenOpRegistry.register("torch.ops.dynamo2nkipy.mark_subgraph_identity.default")
 def mark_subgraph_identity(node: fx.Node, computation_node: ComputationNode) -> None:
@@ -76,7 +81,7 @@ def nki_op_handler(node: fx.Node, computation_node: ComputationNode) -> None:
             kwargs={
                 "grid": f"{grid}",
                 "kernel_return": "True",
-                "compiler_args": compiler_args
+                "compiler_args": compiler_args,
             },
             target_name=kernel_name,
         )
@@ -86,9 +91,11 @@ def nki_op_handler(node: fx.Node, computation_node: ComputationNode) -> None:
     if len(alias_map) == 0:
         nki_output_ast = CodeGenerator.name_store(node.name)
     else:
-        ret_val = node.meta['val']
+        ret_val = node.meta["val"]
         tuple_len = 1 if not isinstance(ret_val, tuple) else len(ret_val)
-        assert len(alias_map) <= tuple_len, f"Cannot have more aliases than total output values!"
+        assert len(alias_map) <= tuple_len, (
+            "Cannot have more aliases than total output values!"
+        )
         if tuple_len == 1:
             input_arg = node.args[alias_map[0]].name
             nki_output_ast = CodeGenerator.name_store(input_arg)
@@ -104,16 +111,18 @@ def nki_op_handler(node: fx.Node, computation_node: ComputationNode) -> None:
                     computation_node.set_nki_aliased_input(input_arg)
                 else:
                     all_nki_outputs.append(temp_vars.next())
-            all_nki_outputs = [CodeGenerator.name_store(name) for name in all_nki_outputs]
+            all_nki_outputs = [
+                CodeGenerator.name_store(name) for name in all_nki_outputs
+            ]
             nki_output_ast = ast.Tuple(all_nki_outputs)
 
-    kernel_call_args=[arg.name for arg in node.args if isinstance(arg, fx.Node)]
-    kernel_call_kwargs={
-        key: value
-        for key, value in node.kwargs.items()
-        if isinstance(value, fx.Node)
+    kernel_call_args = [arg.name for arg in node.args if isinstance(arg, fx.Node)]
+    kernel_call_kwargs = {
+        key: value for key, value in node.kwargs.items() if isinstance(value, fx.Node)
     }
-    call_ast = CodeGenerator.call(kernel_name, "__call__", kernel_call_args, kernel_call_kwargs)
+    call_ast = CodeGenerator.call(
+        kernel_name, "__call__", kernel_call_args, kernel_call_kwargs
+    )
     ast_block.add_assignment(nki_output_ast, call_ast)
     # Add an additional assignment so that the rest of the graph can proceed normally
     ast_block.add_assignment(CodeGenerator.name_store(node.name), nki_output_ast)

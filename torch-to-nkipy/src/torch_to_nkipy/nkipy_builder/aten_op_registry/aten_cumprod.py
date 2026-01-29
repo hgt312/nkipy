@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from ..nkipy_ast import ComputationNode, CodeGenerator
-from ...utils.graph import get_shape_from_fx_node
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import CodeGenerator, ComputationNode
+from torch_to_nkipy.utils.graph import get_shape_from_fx_node
 
 
 @AtenOpRegistry.register("torch.ops.aten.cumprod.default")

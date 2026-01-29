@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from base import NKIPyTestBase
-
 import pytest
 import torch
+from base import NKIPyTestBase
 
 
 class TestAtenFull(NKIPyTestBase):
@@ -25,7 +24,9 @@ class TestAtenFull(NKIPyTestBase):
         """Test aten.full.default with different shapes, values, and dtypes."""
 
         def test_func(t):
-            return t + torch.ops.aten.full.default(size, fill_value, dtype=dtype, device=t.device)
+            return t + torch.ops.aten.full.default(
+                size, fill_value, dtype=dtype, device=t.device
+            )
 
         t = torch.randn(size=size, dtype=dtype)
 
@@ -48,7 +49,9 @@ class TestAtenFull(NKIPyTestBase):
         for size, fill_value, dtype in test_cases:
 
             def test_func(t):
-                return t + torch.ops.aten.full.default(size, fill_value, dtype=dtype, device=t.device)
+                return t + torch.ops.aten.full.default(
+                    size, fill_value, dtype=dtype, device=t.device
+                )
 
             t = torch.randn(size=size, dtype=dtype)
 

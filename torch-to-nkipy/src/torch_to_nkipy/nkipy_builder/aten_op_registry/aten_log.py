@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry, TempVarGenerator
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import (
+    AtenOpRegistry,
+    TempVarGenerator,
+)
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+
 
 @AtenOpRegistry.register("torch.ops.aten.log.default")
 def log_default(node: fx.Node, computation_node: ComputationNode) -> None:
@@ -21,7 +25,9 @@ def log_default(node: fx.Node, computation_node: ComputationNode) -> None:
     # Add small epsilon to prevent log(0)
     safe_input = temp_vars.next()
     ast_block.add_numpy_call_assignment(
-        target=safe_input, func_name="maximum", args=[x, "1e-7"]  # Small epsilon value
+        target=safe_input,
+        func_name="maximum",
+        args=[x, "1e-7"],  # Small epsilon value
     )
 
     # Compute log safely

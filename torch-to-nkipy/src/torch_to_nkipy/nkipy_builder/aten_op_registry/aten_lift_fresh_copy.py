@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+
 
 @AtenOpRegistry.register("torch.ops.aten.lift_fresh_copy.default")
 def lift_fresh_copy_default(node: fx.Node, computation_node: ComputationNode) -> None:
@@ -26,4 +27,3 @@ def lift_fresh_copy_default(node: fx.Node, computation_node: ComputationNode) ->
     ast_block.add_numpy_call_assignment(
         target=node.name, func_name="copy", args=[input_tensor]
     )
-

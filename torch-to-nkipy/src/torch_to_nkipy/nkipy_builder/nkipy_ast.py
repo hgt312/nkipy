@@ -9,8 +9,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Union
 
 from torch.fx.graph import _parse_stack_trace
-
-from ..utils.name import CC_PKG, NUMPY_PKG
+from torch_to_nkipy.utils.name import CC_PKG, NUMPY_PKG
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ class CodeGenerator:
             return ast.List(elts=elements, ctx=ast.Load())
         else:
             raise TypeError(
-                f"Unsupported argument type: {type(arg)}." "Expected str or List[str]."
+                f"Unsupported argument type: {type(arg)}.Expected str or List[str]."
             )
 
     @staticmethod
@@ -348,8 +347,8 @@ class InputNode(CodeNode):
 def create_annotation_ast(annotation_str):
     if not annotation_str:
         return None
-    if '.' in annotation_str:
-        parts = annotation_str.split('.')
+    if "." in annotation_str:
+        parts = annotation_str.split(".")
         value = ast.Name(id=parts[0], ctx=ast.Load())
         for part in parts[1:]:
             value = ast.Attribute(value=value, attr=part, ctx=ast.Load())
@@ -495,7 +494,8 @@ class NKIPyAST:
                 input_idx = input_names.index(input_name)
             except ValueError:
                 raise ValueError(
-                    f"NKI aliased input '{input_name}' not found in inputs: {input_names}"
+                    f"NKI aliased input '{input_name}' not found in "
+                    f"inputs: {input_names}"
                 )
             if input_name in self.nki_aliased_inputs:
                 continue
@@ -525,9 +525,7 @@ class NKIPyAST:
             annot = None
             if input_node.name in self.nki_aliased_inputs:
                 annot = create_annotation_ast("nt.mutable_tensor")
-            input_params.append(
-                ast.arg(arg=input_node.name, annotation=annot)
-            )
+            input_params.append(ast.arg(arg=input_node.name, annotation=annot))
 
         # Create function arguments
         func_args = ast.arguments(

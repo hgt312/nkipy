@@ -11,23 +11,25 @@ import numpy as np
 import torch
 import torch.fx as fx
 from torch._inductor.utils import InputType
-
-
-from ..backend.nkipy_backend_config import get_nkipy_backend_config
-from ..runtime.runtime import compile_load_execute, in_parallel_compile_context
-from ..utils.dtype import (
+from torch_to_nkipy.backend.nkipy_backend_config import get_nkipy_backend_config
+from torch_to_nkipy.nkipy_builder.nkipy_builder import NKIPyBuilder
+from torch_to_nkipy.runtime.runtime import (
+    compile_load_execute,
+    in_parallel_compile_context,
+)
+from torch_to_nkipy.utils.dtype import (
     convert_numpy_arrays_to_tensors,
     meta_tensor_to_numpy,
     tensor_to_numpy,
 )
-from ..utils.graph import (
+from torch_to_nkipy.utils.graph import (
     get_dtype_from_fx_node,
     get_shape_from_fx_node,
     hash_gm_with_tensors,
     load_func_from_file,
     save_gm_to_file,
 )
-from ..utils.name import (
+from torch_to_nkipy.utils.name import (
     ALIAS_MAP_FILE,
     ARG_SHAPE_DTYPE_FILE,
     NKIPY_DEBUG_FUNC_FILE,
@@ -35,9 +37,8 @@ from ..utils.name import (
     NKIPY_FUNC_NAME,
     NONE_IDX_LIST,
 )
-from ..utils.nki import NKIOpRegistry
-from ..utils.ntff_meta import NtffMeta
-from .nkipy_builder import NKIPyBuilder
+from torch_to_nkipy.utils.nki import NKIOpRegistry
+from torch_to_nkipy.utils.ntff_meta import NtffMeta
 
 logger = logging.getLogger(__name__)
 

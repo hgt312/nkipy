@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import torch.fx as fx
-from .base import AtenOpRegistry
-from ..nkipy_ast import ComputationNode
-from ...utils.dtype import torch_to_numpy_dtype_str
-from ...utils.name import NUMPY_PKG
+from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
+from torch_to_nkipy.nkipy_builder.nkipy_ast import ComputationNode
+from torch_to_nkipy.utils.dtype import torch_to_numpy_dtype_str
+from torch_to_nkipy.utils.name import NUMPY_PKG
+
 
 @AtenOpRegistry.register("torch.ops.aten.full.default")
 def full_default(node: fx.Node, computation_node: ComputationNode) -> None:
