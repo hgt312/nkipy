@@ -18,7 +18,7 @@ from torch_to_nkipy.utils.nki import (
 )
 
 
-@AtenOpRegistry.register("torch.ops.dynamo2nkipy.mark_subgraph_identity.default")
+@AtenOpRegistry.register("torch.ops.nkipy.mark_subgraph_identity.default")
 def mark_subgraph_identity(node: fx.Node, computation_node: ComputationNode) -> None:
     """
     Handle custom op mark_subgraph_identity.
