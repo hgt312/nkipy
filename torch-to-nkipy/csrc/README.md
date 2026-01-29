@@ -1,0 +1,1 @@
+We are currently using a lightweight, modified version of the device-registration code from [torch-neuronx](https://github.com/aws-neuron/torch-neuronx).

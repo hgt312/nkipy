@@ -1,0 +1,27 @@
+[build-system]
+requires = [
+  "setuptools>=64",
+  "wheel",
+  "torch==2.8.0",
+  "ninja",
+]
+build-backend = "setuptools.build_meta"
+
+# Project metadata
+[project]
+name = "torch_to_nkipy"
+version = "0.1.0"
+description = "PyTorch extension for AWS Neuron devices using NKIPy"
+requires-python = ">=3.10"
+
+authors = [{ name = "Neuron Science Team (Mason Fu, Yuan Zhou et al.)" }]
+
+dependencies = [
+  "nkipy>=0.0.1",
+  "torch==2.8.0",
+  "torchaudio>=2.7.0",
+  "torchvision>=0.22.0",
+  "transformers==4.56.1",
+  "tabulate",
+  "sentencepiece",
+]

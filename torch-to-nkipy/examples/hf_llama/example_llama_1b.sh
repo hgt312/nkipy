@@ -1,0 +1,1 @@
+python hf_model_inference.py --model meta-llama/Llama-3.2-1B-Instruct
