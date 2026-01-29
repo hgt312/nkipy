@@ -225,7 +225,8 @@ class TestNki(NKIPyTestBase):
         arg_1 = torch.randn(size=shape, dtype=torch.float32)
 
         def cpu_ref_func(a, b):
-            res = a + b + b
+            a[:] = a + b  # modify a in-place to match IO aliasing behavior
+            res = a + b
             return res
 
         self.run_test_on_device(test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func)
@@ -243,10 +244,13 @@ class TestNki(NKIPyTestBase):
 
         def cpu_ref_func(a, b):
             res = a + b
+            a[:] = res  # modify a in-place to match IO aliasing behavior
+            b[:] = res  # modify b in-place to match IO aliasing behavior
             return res
 
         self.run_test_on_device(test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func)
 
+    @pytest.mark.xfail(reason="Function with only NKI kernel (no additional ops) triggers compiler bug.")
     @pytest.mark.parametrize("shape", [(128, 512)])
     def test_nki_io_alias_direct_return(self, shape):
         def test_func(a, b):
@@ -257,8 +261,8 @@ class TestNki(NKIPyTestBase):
         arg_1 = torch.randn(size=shape, dtype=torch.float32)
 
         def cpu_ref_func(a, b):
-            res = a + b
-            return res
+            a[:] = a + b  # modify a in-place to match IO aliasing behavior
+            return a
 
         self.run_test_on_device(test_func, (arg_0, arg_1), cpu_ref_func=cpu_ref_func)
 
