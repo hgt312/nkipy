@@ -8,7 +8,7 @@ requires-python = ">=3.10"
 dependencies = ["nkipy"]
 
 [tool.uv.workspace]
-members = ["nkipy", "spike", "torch-to-nkipy"]
+members = ["nkipy", "spike", "spike-torch", "torch-to-nkipy"]
 
 [[tool.uv.index]]
 name = "neuron"
@@ -17,6 +17,7 @@ explicit = true
 
 [tool.uv.sources]
 spike = { workspace = true }
+spike-torch = { workspace = true }
 nkipy = { workspace = true }
 torch-to-nkipy = { workspace = true }
 
@@ -78,7 +79,7 @@ module = "neuronxcc.*"
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["nkipy/src/nkipy", "spike/src/spike", "torch-to-nkipy/src/torch_to_nkipy"]
+source = ["nkipy/src/nkipy", "spike/src/spike", "spike-torch/src/spike_torch", "torch-to-nkipy/src/torch_to_nkipy"]
 branch = true
 
 [tool.coverage.report]
