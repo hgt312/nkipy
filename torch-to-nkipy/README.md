@@ -1,6 +1,18 @@
 # Torch-to-NKIPy
 
-Torch-to-NKIPy enables running PyTorch models on AWS Trainium accelerators through seamless integration with `torch.compile` and NKIPy. It provides a PyTorch Dynamo backend that automatically converts PyTorch operations to NKIPy kernels for execution on Trainium hardware.
+Run your PyTorch models on AWS Trainium accelerators with just a few lines of code.
+
+## What is Torch-to-NKIPy?
+
+Torch-to-NKIPy is a PyTorch backend that bridges the gap between your existing PyTorch code and AWS Trainium hardware. Instead of rewriting your models, you simply add `torch.compile(backend="nkipy")` and your code runs on Trainium.
+
+**Why use Torch-to-NKIPy?**
+
+- **Zero model rewrites** - Your existing PyTorch models work as-is
+- **Familiar APIs** - Use standard PyTorch patterns you already know
+- **Flexible execution** - Mix CPU and Trainium operations in the same model
+- **Custom kernels** - Inject optimized NKI kernels when you need extra performance
+- **Distributed ready** - Built-in support for multi-device tensor parallelism
 
 ## Features
 
@@ -16,30 +28,36 @@ Torch-to-NKIPy enables running PyTorch models on AWS Trainium accelerators throu
 - **Automatic Tensor Management**: Handles runtime tensor placement and data movement between CPU and Trainium devices
 - **Custom Device Registration**: C++ extension for PyTorch device integration with Neuron Runtime (NRT)
 
-## Architecture
+## Prerequisites
 
-The package consists of several key components:
+Before getting started, make sure you have:
 
-1. **Backend** (`backend/`): PyTorch Dynamo backend registration and graph compilation
-2. **NKIPy Builder** (`nkipy_builder/`): Converts FX graphs to NKIPy AST and generates executable kernels
-3. **ATen Op Registry** (`nkipy_builder/aten_op_registry/`): Maps PyTorch ATen operations to NKIPy implementations
-4. **Device Module** (`device/`): Custom device registration and distributed backend support
-5. **Runtime** (`runtime/`): Execution runtime for compiled kernels
-6. **C++ Extension** (`csrc/`): Native PyTorch device registration and tensor allocation
+- **Hardware**: AWS Trn1 or Trn2 instance
+- **Python**: Version 3.10
+- **PyTorch**: Version 2.8.0
+- **NKIPy**: The NKIPy package must be installed
+
+## Installation
+
+From the root of the nkipy repository, install torch-to-nkipy and its dependencies:
+
+```bash
+uv sync --group torch-to-nkipy
+```
 
 ## Quick Start
 
-### Basic Usage
+Here's the simplest way to get started. This example compiles and runs a small MLP on Trainium:
 
 ```python
 import torch
 import torch.nn as nn
 from torch_to_nkipy import init_nkipy_backend
 
-# Initialize the NKIPy backend
+# Step 1: Initialize the backend
 init_nkipy_backend()
 
-# Define and compile your model
+# Step 2: Define your model with the compile decorator
 @torch.compile(backend="nkipy", fullgraph=True, dynamic=False)
 class MLP(torch.nn.Module):
     def __init__(self):
@@ -51,96 +69,192 @@ class MLP(torch.nn.Module):
     def forward(self, x):
         return self.fc2(self.act_fn(self.fc1(x)))
 
-# Move model and input to nkipy device
+# Step 3: Move model and input to the nkipy device
 model = MLP().to("nkipy")
 input_tensor = torch.randn(2, 4).to("nkipy")
 
-# Run inference
+# Step 4: Run inference
 with torch.no_grad():
     output = model(input_tensor)
+
+# Step 5: Move result back to CPU to print
 print(output.cpu())
 ```
 
-### Hybrid Execution (CPU + Trainium)
+**What happens behind the scenes:**
+1. `init_nkipy_backend()` registers the nkipy backend with PyTorch
+2. `@torch.compile` captures your model's computation graph
+3. `.to("nkipy")` moves tensors to Trainium device memory
+4. The first forward pass compiles the graph to Neuron-optimized code
+5. Subsequent calls use the cached compiled kernel
 
-```python
-# Parts of the model can run on CPU, others on Trainium
-model = MLP().to("nkipy")
+## Examples
 
-def forward(x):
-    x = trainium_layer(x)      # Runs on Trainium
-    x = x.cpu()                 # Transfer to CPU
-    x = cpu_operation(x)        # Runs on CPU
-    x = x.to("nkipy")          # Transfer back to Trainium
-    x = trainium_layer2(x)      # Runs on Trainium
-    return x
-```
+We provide several examples in the `examples/` directory:
 
-### Custom NKI Kernel Integration
+### Basic Examples
 
-```python
-import torch
-from torch_to_nkipy import init_nkipy_backend, NKIOpRegistry
+| Example | Description |
+|---------|-------------|
+| [example_hybrid_exe.py](examples/basics/example_hybrid_exe.py) | Hybrid CPU + Trainium execution |
+| [example_dist.py](examples/basics/example_dist.py) | Distributed training with collective operations |
+| [example_nki_op.py](examples/basics/example_nki_op.py) | Custom NKI kernel integration |
 
-init_nkipy_backend()
+### HuggingFace Llama Examples
 
-# Register custom NKI kernel implementation
-@NKIOpRegistry.register("mylib::custom_add")
-def nki_custom_add_kernel(a_input, b_input):
-    # NKI kernel implementation here
-    # ...
-    return c_output
-
-# Register as PyTorch custom operator
-@torch.library.custom_op("mylib::custom_add", mutates_args=())
-def custom_add(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
-    return nki_custom_add_kernel(a, b)
-
-# Use in compiled code
-@torch.compile(backend="nkipy", fullgraph=True, dynamic=False)
-def my_function(a, b):
-    return custom_add(a, b)
-```
+| Example | Description |
+|---------|-------------|
+| [hf_model_inference.py](examples/hf_llama/hf_model_inference.py) | Single-device Llama inference (1B-3B) |
+| [hf_model_inference_dtensor.py](examples/hf_llama/hf_model_inference_dtensor.py) | Distributed inference with tensor parallelism (up to 70B) |
 
 ## Configuration
 
-The backend can be configured through `init_nkipy_backend()`:
+The `init_nkipy_backend()` function accepts several configuration options:
 
-- `nkipy_cache`: Cache directory for compiled kernels (default: `"./nkipy_cache"`)
-- `log_level`: Logging verbosity (default: `logging.INFO`)
-- `rank`: Process rank for distributed execution (default: `0`)
-- `world_size`: Total number of processes (default: `1`)
-- `additional_compiler_args`: Custom compiler flags (default: `""`)
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `nkipy_cache` | `"./nkipy_cache"` | Directory to store compiled kernels for reuse |
+| `log_level` | `logging.INFO` | Logging verbosity level |
+| `rank` | `0` | Process rank for distributed execution |
+| `world_size` | `1` | Total number of processes in distributed setup |
+| `additional_compiler_args` | `""` | Extra flags to pass to the Neuron compiler |
+
+**Example with custom configuration:**
+```python
+init_nkipy_backend(
+    nkipy_cache="./my_cache",
+    log_level=logging.DEBUG,
+    rank=0,
+    world_size=4,
+)
+```
 
 ## Supported Operations
 
-The package includes implementations for 50+ PyTorch operations including:
+The package includes implementations for 50+ PyTorch operations:
 
-**Arithmetic**: add, sub, mul, div, pow, abs, reciprocal, sqrt, rsqrt
+**Arithmetic:** add, sub, mul, div, pow, abs, reciprocal, sqrt, rsqrt
 
-**Linear Algebra**: matmul, addmm, embedding
+**Linear Algebra:** matmul, addmm, embedding
 
-**Activations**: relu, gelu, sigmoid, hardtanh, leaky_relu, log_softmax, softmax
+**Activations:** relu, gelu, sigmoid, hardtanh, leaky_relu, log_softmax, softmax
 
-**Normalization**: native_layer_norm, linalg_vector_norm
+**Normalization:** native_layer_norm, linalg_vector_norm
 
-**Reductions**: sum, mean, max, min, any, argmax, argmin
+**Reductions:** sum, mean, max, min, any, argmax, argmin
 
-**Indexing/Slicing**: index, select, slice, gather, index_select, squeeze
+**Indexing/Slicing:** index, select, slice, gather, index_select, squeeze
 
-**Shape Operations**: expand, repeat, cat, split_with_sizes, view, permute
+**Shape Operations:** expand, repeat, cat, split_with_sizes, view, permute
 
-**Tensor Creation**: full, arange, scalar_tensor, empty_permuted
+**Tensor Creation:** full, arange, scalar_tensor, empty_permuted
 
-**Logical**: where, clamp, ne, bitwise_not
+**Logical:** where, clamp, ne, bitwise_not
 
-**Collectives**: all_reduce, all_gather (for distributed training)
+**Collectives:** all_reduce, all_gather (for distributed training)
 
-See `nkipy_builder/aten_op_registry/` for the complete list.
+For the complete list, see the `nkipy_builder/aten_op_registry/` directory.
 
-## Development
+## Architecture Overview
 
-### Project Structure
+Torch-to-NKIPy consists of several components that work together:
+
+```
+Your PyTorch Code
+       |
+       v
++------------------+
+|  torch.compile   |  <- Captures computation graph
++------------------+
+       |
+       v
++------------------+
+|  NKIPy Backend   |  <- Converts graph to NKIPy AST
++------------------+
+       |
+       v
++------------------+
+|  ATen Op Registry|  <- Maps PyTorch ops to NKIPy
++------------------+
+       |
+       v
++------------------+
+|  Neuron Compiler |  <- Produces optimized NEFF
++------------------+
+       |
+       v
++------------------+
+|  Neuron Runtime  |  <- Executes on Trainium
++------------------+
+```
+
+**Key Components:**
+
+1. **Backend** (`backend/`): PyTorch Dynamo backend registration and graph compilation
+2. **NKIPy Builder** (`nkipy_builder/`): Converts FX graphs to NKIPy AST and generates executable kernels
+3. **ATen Op Registry** (`nkipy_builder/aten_op_registry/`): Maps PyTorch ATen operations to NKIPy implementations
+4. **Device Module** (`device/`): Custom device registration and distributed backend support
+5. **Runtime** (`runtime/`): Execution runtime for compiled kernels
+6. **C++ Extension** (`csrc/`): Native PyTorch device registration and tensor allocation
+
+## FAQ
+
+### How do I move tensors between CPU and Trainium?
+
+Use the standard PyTorch `.to()` method or `.cpu()`:
+
+```python
+# CPU to Trainium
+x_device = x_cpu.to("nkipy")
+
+# Trainium to CPU
+x_cpu = x_device.cpu()
+# or
+x_cpu = x_device.to("cpu")
+```
+
+### What models are supported?
+
+Any PyTorch model that uses supported operations can run on Trainium. We've tested extensively with:
+- Custom MLPs and transformers
+- HuggingFace Llama models (1B to 70B)
+- Models using standard PyTorch layers (Linear, LayerNorm, etc.)
+
+### How do I debug compilation issues?
+
+1. **Check the cache directory** - Look in `nkipy_cache/` for generated code and compiler logs
+2. **Enable debug logging** - Set `log_level=logging.DEBUG` in `init_nkipy_backend()`
+3. **Look for unsupported ops** - If an operation isn't in the registry, it will fall back to CPU
+
+### Can I use custom NKI kernels?
+
+Yes! Use the `NKIOpRegistry.register()` decorator to integrate custom NKI kernels. See the [Custom NKI Kernel example](#3-custom-nki-kernel-integration) above.
+
+### How does distributed training work?
+
+Torch-to-NKIPy supports PyTorch's distributed API with the `"nkipy"` backend:
+
+```python
+torch.distributed.init_process_group("nkipy")
+init_nkipy_backend(rank=dist.get_rank(), world_size=dist.get_world_size())
+```
+
+Then use standard collective operations like `dist.all_reduce()` in your model.
+
+### What's the first-run compilation overhead?
+
+The first forward pass compiles your model to Neuron code, which takes some time. Subsequent runs use cached compiled kernels. To warm up:
+
+```python
+# Warm-up run
+with torch.no_grad():
+    _ = model(dummy_input)
+
+# Now run at full speed
+output = model(real_input)
+```
+
+## Project Structure
 
 ```
 torch-to-nkipy/
@@ -157,7 +271,17 @@ torch-to-nkipy/
 │   ├── nkipy_tensor_allocator.cpp/h  # Memory allocation
 │   ├── python_bindings.cpp        # PyBind11 bindings
 │   └── torch_register.cpp/h       # PyTorch integration
+├── examples/                      # Example scripts
+│   ├── basics/                    # Basic usage examples
+│   └── hf_llama/                  # HuggingFace Llama examples
+├── tests/                         # Test suite
 ├── setup.py                       # Build configuration
 ├── pyproject.toml                 # Package metadata
 └── MANIFEST.in                    # Source distribution manifest
 ```
+
+## Getting Help
+
+- **Report issues**: Open an issue on GitHub
+- **Check examples**: The `examples/` directory has working code for common use cases
+- **Enable debug logging**: Set `log_level=logging.DEBUG` for detailed output
