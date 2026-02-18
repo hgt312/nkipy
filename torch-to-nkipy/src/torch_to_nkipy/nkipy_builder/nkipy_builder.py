@@ -271,6 +271,11 @@ class NKIPyBuilder:
         Args:
             node: The placeholder FX node
         """
+        # Skip dead placeholders so generated NKIPy function signature only keeps
+        # inputs that participate in computation.
+        if len(node.users) == 0:
+            logger.debug(f"Skipping dead input placeholder: {node.name}")
+            return
 
         # create and add an input node
         input_node = InputNode(

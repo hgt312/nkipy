@@ -170,36 +170,111 @@ void copy_cpu_to_spiky(const at::Tensor& src, at::Tensor& dst) {
   TORCH_CHECK(src.is_cpu(), "Source tensor must be CPU");
   TORCH_CHECK(dst.device().type() == c10::DeviceType::PrivateUse1, "Destination must be nkipy");
   TORCH_CHECK(src.is_contiguous(), "Source CPU tensor must be contiguous");
-  TORCH_CHECK(dst.is_contiguous(), "Destination nkipy tensor must be contiguous");
 
   nrt_tensor_t* nrt_dst = get_nrt_tensor(dst);
   TORCH_CHECK(nrt_dst != nullptr, "Failed to get nkipy tensor handle");
-  size_t byte_offset = static_cast<size_t>(dst.storage_offset()) * dst.element_size();
   if (src.nbytes() == 0) return;
-  NRT_STATUS status = nrt_tensor_write(nrt_dst, src.data_ptr(), byte_offset, src.nbytes());
-  TORCH_CHECK(status == NRT_SUCCESS, "Failed CPU->nkipy copy, status=", (int)status);
+
+  if (dst.is_contiguous()) {
+    size_t byte_offset = static_cast<size_t>(dst.storage_offset()) * dst.element_size();
+    NRT_STATUS status = nrt_tensor_write(nrt_dst, src.data_ptr(), byte_offset, src.nbytes());
+    TORCH_CHECK(status == NRT_SUCCESS, "Failed CPU->nkipy copy, status=", (int)status);
+    return;
+  }
+
+  // Slow path for non-contiguous nkipy views: element-wise scatter from contiguous CPU src.
+  auto sizes = dst.sizes();
+  auto strides = dst.strides();
+  const int64_t ndim = dst.dim();
+  const int64_t numel = dst.numel();
+  const int64_t storage_offset = dst.storage_offset();
+  const size_t elem_size = static_cast<size_t>(dst.element_size());
+  auto* src_bytes = static_cast<const char*>(src.data_ptr());
+
+  for (int64_t linear_idx = 0; linear_idx < numel; ++linear_idx) {
+    int64_t dst_elem_offset = storage_offset;
+    if (ndim > 0) {
+      int64_t tmp = linear_idx;
+      for (int64_t d = ndim - 1; d >= 0; --d) {
+        const int64_t size_d = sizes[static_cast<size_t>(d)];
+        const int64_t coord = tmp % size_d;
+        tmp /= size_d;
+        dst_elem_offset += coord * strides[static_cast<size_t>(d)];
+      }
+    }
+    size_t dst_byte_offset = static_cast<size_t>(dst_elem_offset) * elem_size;
+    NRT_STATUS status = nrt_tensor_write(
+        nrt_dst,
+        src_bytes + static_cast<size_t>(linear_idx) * elem_size,
+        dst_byte_offset,
+        elem_size);
+    TORCH_CHECK(
+        status == NRT_SUCCESS,
+        "Failed CPU->nkipy element copy, status=", (int)status,
+        ", linear_idx=", linear_idx);
+  }
 }
 
 void copy_spiky_to_cpu(const at::Tensor& src, at::Tensor& dst) {
   TORCH_CHECK(src.device().type() == c10::DeviceType::PrivateUse1, "Source must be nkipy");
   TORCH_CHECK(dst.is_cpu(), "Destination must be CPU");
-  TORCH_CHECK(src.is_contiguous(), "Source nkipy tensor must be contiguous for copy to CPU");
   TORCH_CHECK(dst.is_contiguous(), "Destination CPU tensor must be contiguous");
 
   nrt_tensor_t* nrt_src = get_nrt_tensor(src);
   TORCH_CHECK(nrt_src != nullptr, "Failed to get nkipy tensor handle");
-  size_t byte_offset = static_cast<size_t>(src.storage_offset()) * src.element_size();
   if (dst.nbytes() == 0) return;
-  NRT_STATUS status = nrt_tensor_read(nrt_src, dst.data_ptr(), byte_offset, dst.nbytes());
-  TORCH_CHECK(status == NRT_SUCCESS, "Failed nkipy->CPU copy, status=", (int)status);
+
+  if (src.is_contiguous()) {
+    size_t byte_offset = static_cast<size_t>(src.storage_offset()) * src.element_size();
+    NRT_STATUS status = nrt_tensor_read(nrt_src, dst.data_ptr(), byte_offset, dst.nbytes());
+    TORCH_CHECK(status == NRT_SUCCESS, "Failed nkipy->CPU copy, status=", (int)status);
+    return;
+  }
+
+  // Slow path for non-contiguous nkipy views: element-wise gather into contiguous CPU dst.
+  auto sizes = src.sizes();
+  auto strides = src.strides();
+  const int64_t ndim = src.dim();
+  const int64_t numel = src.numel();
+  const int64_t storage_offset = src.storage_offset();
+  const size_t elem_size = static_cast<size_t>(src.element_size());
+  auto* dst_bytes = static_cast<char*>(dst.data_ptr());
+
+  for (int64_t linear_idx = 0; linear_idx < numel; ++linear_idx) {
+    int64_t src_elem_offset = storage_offset;
+    if (ndim > 0) {
+      int64_t tmp = linear_idx;
+      for (int64_t d = ndim - 1; d >= 0; --d) {
+        const int64_t size_d = sizes[static_cast<size_t>(d)];
+        const int64_t coord = tmp % size_d;
+        tmp /= size_d;
+        src_elem_offset += coord * strides[static_cast<size_t>(d)];
+      }
+    }
+    size_t src_byte_offset = static_cast<size_t>(src_elem_offset) * elem_size;
+    NRT_STATUS status = nrt_tensor_read(
+        nrt_src,
+        dst_bytes + static_cast<size_t>(linear_idx) * elem_size,
+        src_byte_offset,
+        elem_size);
+    TORCH_CHECK(
+        status == NRT_SUCCESS,
+        "Failed nkipy->CPU element copy, status=", (int)status,
+        ", linear_idx=", linear_idx);
+  }
 }
 
 void copy_spiky_to_spiky(const at::Tensor& src, at::Tensor& dst) {
   TORCH_CHECK(src.device().type() == c10::DeviceType::PrivateUse1, "Source must be nkipy");
   TORCH_CHECK(dst.device().type() == c10::DeviceType::PrivateUse1, "Destination must be nkipy");
   TORCH_CHECK(src.device().index() == dst.device().index(), "Cross-core copy not supported");
-  TORCH_CHECK(src.is_contiguous(), "Source nkipy tensor must be contiguous");
-  TORCH_CHECK(dst.is_contiguous(), "Destination nkipy tensor must be contiguous");
+
+  if (!src.is_contiguous() || !dst.is_contiguous()) {
+    at::Tensor tmp_cpu = at::empty(src.sizes(), src.options().device(at::kCPU));
+    copy_spiky_to_cpu(src, tmp_cpu);
+    copy_cpu_to_spiky(tmp_cpu, dst);
+    return;
+  }
 
   nrt_tensor_t* nrt_src = get_nrt_tensor(src);
   nrt_tensor_t* nrt_dst = get_nrt_tensor(dst);

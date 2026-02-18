@@ -277,14 +277,80 @@ class NKIPyTensorRef(TensorArithmeticMixin, TensorOperationMixin):
         This is called when numpy ufuncs are applied to NKIPyTensorRef objects.
         We dispatch to registered implementations.
         """
+        if method == "__call__":
+            _set_source_location(find_source_loc())
+            try:
+                return self.__array_function__(ufunc, (), inputs, kwargs)
+            finally:
+                _set_source_location(None)
+
+        # Support in-place scatter-add path used by np.add.at(...)
+        if method == "at" and ufunc is np.add:
+            if len(inputs) != 3:
+                raise NotImplementedError(
+                    f"np.add.at expects 3 inputs, got {len(inputs)}"
+                )
+            target, indices, values = inputs
+            if not isinstance(target, NKIPyTensorRef):
+                return NotImplemented
+
+            _set_source_location(find_source_loc())
+            try:
+                # Normalize to tuple-style indexing and pad missing dimensions.
+                if not isinstance(indices, tuple):
+                    indices = (indices,)
+                while len(indices) < len(target.shape):
+                    indices = indices + (slice(None),)
+
+                tensor_idx_dim = None
+                tensor_idx_value = None
+                for dim, idx in enumerate(indices):
+                    if isinstance(idx, (NKIPyTensorRef, np.ndarray, list)):
+                        if tensor_idx_dim is not None:
+                            raise NotImplementedError(
+                                "np.add.at currently supports exactly one tensor index dimension"
+                            )
+                        tensor_idx_dim = dim
+                        tensor_idx_value = (
+                            np.asarray(idx, dtype=np.int32) if isinstance(idx, list) else idx
+                        )
+                    elif isinstance(idx, slice):
+                        if idx.start is not None or idx.stop is not None or idx.step is not None:
+                            raise NotImplementedError(
+                                "np.add.at only supports full-slice dims for non-indexed axes"
+                            )
+                    else:
+                        raise NotImplementedError(
+                            f"np.add.at unsupported index type: {type(idx)}"
+                        )
+
+                if tensor_idx_dim is None:
+                    raise NotImplementedError(
+                        "np.add.at currently requires one tensor/array index dimension"
+                    )
+
+                from nkipy.core import ops as nkipy_ops
+
+                result = nkipy_ops.put_along_axis(
+                    target,
+                    tensor_idx_value,
+                    values,
+                    axis=tensor_idx_dim,
+                    update_computation="add",
+                )
+                if result is not None:
+                    target.backend_tensor = result.backend_tensor
+                    target._shape = result.shape
+                    target._dtype = result.dtype
+                return None
+            finally:
+                _set_source_location(None)
+
+        # Other ufunc methods are not supported.
         if method != "__call__":
             return NotImplemented
 
-        _set_source_location(find_source_loc())
-        try:
-            return self.__array_function__(ufunc, (), inputs, kwargs)
-        finally:
-            _set_source_location(None)
+        return NotImplemented
 
     def __array_function__(self, func, types, args, kwargs):
         """

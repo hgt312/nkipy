@@ -10,7 +10,9 @@ NRT initialization remains explicit: call `spiky.init()` before allocating any
 `torch.device("nkipy")` tensors.
 """
 
+import os
 import torch
+import spiky as _spiky
 
 from . import _C as _ext  # type: ignore
 from .device import device_module
@@ -29,6 +31,37 @@ def _register():
 
 
 _register()
+
+
+def init_nkipy_backend(
+    nkipy_cache: str | None = None,
+    additional_compiler_args: str | None = None,
+    keep_outputs_on_device: bool | None = None,
+    pipelined: bool | None = None,
+    device_id: int = 0,
+) -> None:
+    """Backward-compatible nanochat init hook.
+
+    Newer spiky runtimes use process environment for compile/runtime knobs.
+    Keep accepting legacy arguments so callers (e.g. nanochat) do not need to
+    branch on spiky version.
+    """
+    if nkipy_cache is not None:
+        os.environ["NANOCHAT_NKIPY_CACHE"] = nkipy_cache
+    if additional_compiler_args is not None:
+        os.environ["NANOCHAT_NKIPY_COMPILER_ARGS"] = additional_compiler_args
+    if keep_outputs_on_device is not None:
+        os.environ["NANOCHAT_NKIPY_KEEP_OUTPUTS_ON_DEVICE"] = (
+            "1" if keep_outputs_on_device else "0"
+        )
+    if pipelined is not None:
+        os.environ["NANOCHAT_NKIPY_PIPELINED"] = "1" if pipelined else "0"
+    _spiky.init(int(device_id))
+
+
+def is_nkipy_backend_initialized() -> bool:
+    """Backward-compatible nanochat probe hook."""
+    return bool(_spiky.is_initialized())
 
 
 def device_count() -> int:
@@ -56,6 +89,8 @@ def get_cached_blocks() -> int:
 
 
 __all__ = [
+    "init_nkipy_backend",
+    "is_nkipy_backend_initialized",
     "device_count",
     "current_device",
     "set_device",

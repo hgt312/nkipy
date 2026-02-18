@@ -6,6 +6,7 @@
 import contextlib
 import os
 import pickle
+import shutil
 from pathlib import Path
 from typing import Callable, Tuple
 
@@ -79,12 +80,18 @@ def compile_model(
 
     # Check if compilation artifacts already exist
     if neff_path.exists() and io_specs_path.exists():
-        # Load existing I/O specifications from cache
-        with open(io_specs_path, "rb") as f:
-            io_specs = pickle.load(f)
-        return neff_path, io_specs
+        # Load existing I/O specifications from cache.
+        # If the cache is corrupt/partial, fall through and rebuild.
+        try:
+            with open(io_specs_path, "rb") as f:
+                io_specs = pickle.load(f)
+            return neff_path, io_specs
+        except (EOFError, pickle.UnpicklingError, AttributeError, ValueError):
+            io_specs_path.unlink(missing_ok=True)
 
-    # Ensure the output directory exists
+    # Ensure a clean output directory before compiling.
+    if kernel_compile_dir.exists():
+        shutil.rmtree(kernel_compile_dir)
     kernel_compile_dir.mkdir(parents=True, exist_ok=True)
 
     # Change to kernel_dir so that constant tensor .npy files can be found
@@ -97,7 +104,10 @@ def compile_model(
         if use_numpy_args:
             args_numpy = numpy_args
         else:
-            args_numpy = [meta_tensor_to_numpy(arg) for arg in args]
+            args_numpy = [
+                meta_tensor_to_numpy(arg) if isinstance(arg, torch.Tensor) else arg
+                for arg in args
+            ]
 
         # Step 3: Specialize the traced kernel with concrete shapes and types
         traced_kernel.specialize(*args_numpy)
@@ -112,20 +122,21 @@ def compile_model(
         save_artifacts=True,  # Save additional artifacts for debugging
         additional_compiler_args=additional_args,
     )
-    # Step 5: Extract and save I/O specifications for later use
-    with open(io_specs_path, "wb") as f:
-        # Convert NKIPY tensor specs to our TensorSpec format
-        input_specs = [
-            TensorSpec(name=t.name, shape=t.shape, dtype=numpy_to_torch_dtype(t.dtype))
-            for t in traced_kernel._code.inputs
-        ]
-        output_specs = [
-            TensorSpec(name=t.name, shape=t.shape, dtype=numpy_to_torch_dtype(t.dtype))
-            for t in traced_kernel._code.outputs
-        ]
-
-        io_specs = IOSpecs(input_specs=input_specs, output_specs=output_specs)
+    # Step 5: Extract and save I/O specifications for later use.
+    # Build specs before opening output file to avoid leaving empty/corrupt cache files.
+    input_specs = [
+        TensorSpec(name=t.name, shape=t.shape, dtype=numpy_to_torch_dtype(t.dtype))
+        for t in traced_kernel._code.inputs
+    ]
+    output_specs = [
+        TensorSpec(name=t.name, shape=t.shape, dtype=numpy_to_torch_dtype(t.dtype))
+        for t in traced_kernel._code.outputs
+    ]
+    io_specs = IOSpecs(input_specs=input_specs, output_specs=output_specs)
+    tmp_io_specs_path = io_specs_path.with_suffix(io_specs_path.suffix + ".tmp")
+    with open(tmp_io_specs_path, "wb") as f:
         pickle.dump(io_specs, f)
+    os.replace(tmp_io_specs_path, io_specs_path)
 
     return Path(neff_path), io_specs
 

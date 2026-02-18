@@ -88,6 +88,10 @@ class NKIPyKernel:
         self.alias_map: Dict[int, int] = {}
         self.non_tensor_outputs: Dict[int, Any] = {}
         self.gm = gm
+        self._placeholder_names = [
+            node.name for node in self.gm.graph.nodes if node.op == "placeholder"
+        ]
+        self._active_input_indices = list(range(len(self._placeholder_names)))
 
         # FIXME fix to a default value
         self.on_device = True
@@ -99,6 +103,7 @@ class NKIPyKernel:
 
         logger.info(f"Loading kernel with hash {self.kernel_hash}")
         self._load_cached_kernel()
+        self._refresh_active_input_indices()
 
         self.ntff_meta = NtffMeta.from_options_and_kernel_hash(
             options, self.kernel_hash
@@ -160,6 +165,40 @@ class NKIPyKernel:
         except (IOError, pickle.UnpicklingError) as e:
             logger.error(f"Failed to load cached kernel: {e}")
             raise ValueError(f"Failed to load cached kernel: {e}") from e
+
+    def _refresh_active_input_indices(self) -> None:
+        """
+        Build a mapping from original FX placeholder order to generated function args.
+
+        Dead placeholders are dropped during codegen; this mapping ensures runtime
+        execution only forwards active inputs to nkipy_func/neff.
+        """
+        if self.nkipy_func is None:
+            self._active_input_indices = list(range(len(self._placeholder_names)))
+            return
+
+        active_names = list(
+            self.nkipy_func.__code__.co_varnames[: self.nkipy_func.__code__.co_argcount]
+        )
+        name_to_idx = {name: idx for idx, name in enumerate(self._placeholder_names)}
+
+        indices = []
+        for name in active_names:
+            if name not in name_to_idx:
+                logger.warning(
+                    f"Unable to map kernel input '{name}' back to FX placeholders; "
+                    "falling back to positional argument mapping."
+                )
+                self._active_input_indices = list(range(min(len(active_names), len(self._placeholder_names))))
+                return
+            indices.append(name_to_idx[name])
+        self._active_input_indices = indices
+
+    def _select_active_args(self, args):
+        """Select runtime args that correspond to active generated kernel inputs."""
+        if len(self._active_input_indices) == len(args):
+            return list(args)
+        return [args[i] for i in self._active_input_indices]
 
     def _build_new_kernel(
         self, gm: fx.GraphModule, example_inputs: Sequence[InputType]
@@ -252,8 +291,10 @@ class NKIPyKernel:
         if self.nkipy_func is None:
             raise RuntimeError("Kernel not initialized - nkipy_func is None")
 
+        active_args = self._select_active_args(args)
+
         # Convert PyTorch tensors to NumPy arrays
-        args_numpy = [tensor_to_numpy(arg) for arg in args]
+        args_numpy = [tensor_to_numpy(arg) for arg in active_args]
 
         # Execute the nkipy function
         out_numpy = self.nkipy_func(*args_numpy)
@@ -277,10 +318,11 @@ class NKIPyKernel:
         Returns:
             Output tensor(s) from the compiled function
         """
+        active_args = self._select_active_args(args)
         return compile_load_execute(
             nkipy_func=self.nkipy_func,
             kernel_hash=self.kernel_hash,
-            args=args,
+            args=active_args,
             alias_map=self.alias_map,
             non_tensor_outputs=self.non_tensor_outputs,
             kernel_dir=self.kernel_paths["kernel_dir"],
@@ -345,7 +387,7 @@ class NKIPyKernel:
                 )
                 # We write the input shapes and data types into the compile cache
                 # directory for later use
-                self._save_arg_shape_dtype(args)
+                self._save_arg_shape_dtype(self._select_active_args(args))
                 return self._generate_dummy_outputs(args[0].device)
             else:
                 return self._execute_on_device(*args)

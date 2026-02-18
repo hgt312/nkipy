@@ -15,7 +15,17 @@ class SpikyBackend(RuntimeBackend):
         self._initialized = False
 
     def register_torch_device(self) -> None:
-        """Import spike_torch to register nkipy as a PyTorch custom device."""
+        """Register nkipy as a PyTorch custom device."""
+        # Register torch.compile backend ("nkipy") from spiky.torch.
+        try:
+            import spiky.torch  # noqa: F401
+        except Exception:
+            # Keep going: device registration can still happen via spike_torch.
+            pass
+
+        # Ensure PrivateUse1 device hooks/module are registered as "nkipy".
+        # spiky.torch only registers the compile backend; the custom device
+        # registration still comes from spike_torch.
         import spike_torch  # noqa: F401
 
     def init(self, visible_core: int) -> None:

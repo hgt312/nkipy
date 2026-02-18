@@ -593,25 +593,34 @@ std::vector<DeviceTensor> Engine::DetachOutputs(int64_t bundle_id, int buffer_id
   const Bundle& bundle = GetBundleOrThrow(bundle_id);
   int64_t pad_dim = bundle.PrimaryPadDim();
 
+  // Use the executed bucket's output_infos for correct shapes.
+  // The NEFF writes contiguously with bucket_size stride, not max_bucket_size.
+  // Falling back to the unified buffer's (max-bucket) infos when the bucket
+  // hasn't been loaded keeps the previous behaviour for edge cases.
+  const auto bk_it = bundle.buckets_.find(bucket_size);
+  const std::vector<TensorInfo>& out_infos =
+      (bk_it != bundle.buckets_.end() && !bk_it->second.output_infos.empty())
+          ? bk_it->second.output_infos
+          : ub.output_infos;
+
   std::vector<DeviceTensor> outputs;
   outputs.reserve(ub.outputs[buffer_idx].size());
 
-  for (size_t i = 0; i < ub.outputs[buffer_idx].size() && i < ub.output_infos.size(); ++i) {
+  for (size_t i = 0; i < ub.outputs[buffer_idx].size() && i < out_infos.size(); ++i) {
     nrt_tensor_t* scratch = ub.outputs[buffer_idx][i];
-    const TensorInfo& info = ub.output_infos[i];
+    const TensorInfo& info = out_infos[i];
     if (!scratch) continue;
 
     std::vector<int64_t> padded_shape = info.shape;
     size_t elem_size = ElemSizeBytes(info.dtype);
 
-    // Only unpad outputs whose pad_dim size matches a bucket size (was actually padded).
-    // Reduction outputs (e.g., sum(dim=0)) have different sizes and must be skipped.
+    // Only unpad outputs whose pad_dim size matches the executed bucket (was actually padded).
+    // Weight pass-throughs and reduction outputs have different sizes and must be skipped.
     bool needs_unpad = unpad_outputs && (actual_len > 0) &&
                        (pad_dim >= 0) &&
                        (pad_dim < static_cast<int64_t>(padded_shape.size())) &&
                        (actual_len < padded_shape[static_cast<size_t>(pad_dim)]) &&
-                       (padded_shape[static_cast<size_t>(pad_dim)] == bucket_size ||
-                        padded_shape[static_cast<size_t>(pad_dim)] == ub.max_bucket_size);
+                       (padded_shape[static_cast<size_t>(pad_dim)] == bucket_size);
 
     std::vector<int64_t> out_shape = padded_shape;
     if (needs_unpad) out_shape[static_cast<size_t>(pad_dim)] = actual_len;
@@ -621,12 +630,9 @@ std::vector<DeviceTensor> Engine::DetachOutputs(int64_t bundle_id, int buffer_id
 
     nrt_tensor_t* detached = pool.Acquire(out_bytes, dev, "spiky_detached_out");
     if (needs_unpad) {
-      if (ub.max_bucket_size > 0) {
-        UnpadFromDeviceWithMaxBucketStride(scratch, detached, ub.max_bucket_size,
-                                           actual_len, pad_dim, out_shape, elem_size);
-      } else {
-        UnpadFromDeviceStrided(scratch, detached, padded_shape, actual_len, pad_dim, elem_size);
-      }
+      // Use bucket_size as stride: NEFF output is contiguous at bucket_size, not max.
+      UnpadFromDeviceWithMaxBucketStride(scratch, detached, bucket_size,
+                                         actual_len, pad_dim, out_shape, elem_size);
     } else {
       CheckNRT(nrt_tensor_copy(scratch, 0, detached, 0, out_bytes), "nrt_tensor_copy(detach)");
     }

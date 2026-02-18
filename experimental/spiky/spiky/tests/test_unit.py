@@ -117,6 +117,29 @@ class TestInputNumpyConversion:
         with pytest.raises(RuntimeError):
             t.numpy()
 
+    def test_bool_tensor_normalizes_to_uint8_buffer(self):
+        """Bool tensors must not reach runtime as '?' PEP3118 format."""
+        import numpy as np
+
+        from spiky.callable import _tensor_to_numpy_runtime
+
+        t = torch.tensor([[True, False, True]], dtype=torch.bool)
+        arr = _tensor_to_numpy_runtime(t)
+        assert arr.dtype == np.uint8
+        assert memoryview(arr).format == "B"
+        assert arr.tolist() == [[1, 0, 1]]
+
+    def test_bool_scalar_normalizes_to_uint8_buffer(self):
+        """Scalar bools (non-tensor args) follow the same normalization."""
+        import numpy as np
+
+        from spiky.callable import _normalize_numpy_int_buffer_format
+
+        arr = _normalize_numpy_int_buffer_format(np.array(True))
+        assert arr.dtype == np.uint8
+        assert memoryview(arr).format == "B"
+        assert int(arr) == 1
+
 
 # ---------------------------------------------------------------------------
 # Bug 6: parallel_compile_context exception safety
@@ -388,6 +411,7 @@ class TestBuildAdjustedDynamicSpecs:
         )
         callable_obj = NKIPyCallable.__new__(NKIPyCallable)
         callable_obj._config = config
+        callable_obj._io_specs_by_bucket = {}
         result = callable_obj._build_adjusted_dynamic_specs()
         assert result == {0: 1}
 
@@ -404,6 +428,7 @@ class TestBuildAdjustedDynamicSpecs:
         )
         callable_obj = NKIPyCallable.__new__(NKIPyCallable)
         callable_obj._config = config
+        callable_obj._io_specs_by_bucket = {}
         result = callable_obj._build_adjusted_dynamic_specs()
         # arg_idx 1 minus 1 SymInt before it = 0
         assert result == {0: 0}
@@ -421,6 +446,7 @@ class TestBuildAdjustedDynamicSpecs:
         )
         callable_obj = NKIPyCallable.__new__(NKIPyCallable)
         callable_obj._config = config
+        callable_obj._io_specs_by_bucket = {}
         result = callable_obj._build_adjusted_dynamic_specs()
         # SymInt at 2 is after arg_idx 0, so no shift
         assert result == {0: 1}
@@ -438,6 +464,7 @@ class TestBuildAdjustedDynamicSpecs:
         )
         callable_obj = NKIPyCallable.__new__(NKIPyCallable)
         callable_obj._config = config
+        callable_obj._io_specs_by_bucket = {}
         result = callable_obj._build_adjusted_dynamic_specs()
         # arg_idx 3 minus 2 SymInts before it = 1
         assert result == {1: 0}

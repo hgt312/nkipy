@@ -458,16 +458,22 @@ class HLOModule:
 
             elif op.op_name == "scatter":
                 comp_name = op.attributes.get("update_computation", "add")
-                if comp_name != "assign":
+                if comp_name not in {"assign", "add"}:
                     raise NotImplementedError(
                         f"Scatter update_computation '{comp_name}' not supported."
-                        " Only 'assign' is implemented."
+                        " Supported: 'assign', 'add'."
                     )
+                if comp_name == "assign":
+                    name_prefix = "scatter_assign"
+                    opcode = "copy"
+                else:
+                    name_prefix = f"scatter_{comp_name}"
+                    opcode = comp_name
                 key = ("scatter", comp_name, str(op.result_dtype))
                 computations_needed[key] = (
-                    f"scatter_{comp_name}",
+                    name_prefix,
                     op.result_dtype,
-                    "copy",
+                    opcode,
                 )
 
             elif op.op_name in ("all-reduce", "reduce-scatter"):
@@ -1229,6 +1235,9 @@ def _get_type_key(val) -> type:
             return dtype.type
         # Handle dtype stored as type class (e.g., np.bool_, np.float32)
         if isinstance(dtype, type):
+            # Builtin bool should map to numpy bool key used in promotion table.
+            if dtype is bool:
+                return np.bool_
             return dtype
         # Handle ml_dtypes and other dtype-like objects
         # Try to convert to np.dtype first

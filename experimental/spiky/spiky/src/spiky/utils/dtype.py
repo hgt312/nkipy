@@ -14,6 +14,7 @@ from spiky.utils.names import NUMPY_PKG
 logger = logging.getLogger(__name__)
 
 DTYPE_MAPPINGS = [
+    (bool, torch.bool),
     (np.bool_, torch.bool),
     (np.uint8, torch.uint8),
     (np.int8, torch.int8),
@@ -71,6 +72,12 @@ def numpy_to_torch_dtype(np_dtype: Union[type, np.dtype]) -> torch.dtype:
     """
     if isinstance(np_dtype, np.dtype):
         np_dtype = np_dtype.type
+    else:
+        # Normalize aliases like builtin bool/int/float into canonical numpy dtype types.
+        try:
+            np_dtype = np.dtype(np_dtype).type
+        except TypeError:
+            pass
 
     if np_dtype not in NUMPY_TO_TORCH_DTYPE_MAP:
         raise ValueError(f"Unsupported NumPy dtype: {np_dtype}.")

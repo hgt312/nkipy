@@ -10,7 +10,7 @@ import numpy as np
 
 import nkipy.core.typing as nt
 from nkipy.core._numpy_dispatch import register_all_numpy_apis
-from nkipy.core.backend.hlo import HLOModule, HLOTraceContext
+from nkipy.core.backend.hlo import HLOModule, HLOTraceContext, as_hlo_tensor
 from nkipy.core.ops._registry import set_backend
 from nkipy.core.tensor import NKIPyTensorRef
 
@@ -179,6 +179,14 @@ class NKIPyKernel:
             ret = list(ret)
             ctx = HLOTraceContext._global_ctx
             for i, r in enumerate(ret):
+                # Some lowered graphs can surface literal scalars in the return
+                # tuple (e.g. scalar_tensor constants captured for backward).
+                # Materialize them as HLO constants so outputs are uniform.
+                if isinstance(r, np.ndarray) or np.isscalar(r):
+                    const_arr = r if isinstance(r, np.ndarray) else np.array(r)
+                    const_tensor = as_hlo_tensor(ctx, const_arr, const_arr.dtype)
+                    r = NKIPyTensorRef(const_tensor, name="")
+                    ret[i] = r
                 if not isinstance(r, NKIPyTensorRef):
                     continue
                 bt = r.backend_tensor

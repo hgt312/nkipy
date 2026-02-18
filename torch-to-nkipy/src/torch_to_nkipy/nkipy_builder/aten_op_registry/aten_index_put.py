@@ -1,6 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import ast
+
 import torch.fx as fx
 
 from torch_to_nkipy.nkipy_builder.aten_op_registry.base import AtenOpRegistry
@@ -28,6 +30,18 @@ def index_put_default(node: fx.Node, computation_node: ComputationNode) -> None:
     indices = node.args[1]
     value = node.args[2]
 
+    # accumulate=True requires scatter-add semantics (e.g., embedding backward).
+    accumulate = False
+    if len(node.args) > 3:
+        if isinstance(node.args[3], bool):
+            accumulate = node.args[3]
+        elif isinstance(node.args[3], fx.Node):
+            raise NotImplementedError("index_put with non-constant accumulate is not supported")
+        else:
+            accumulate = bool(node.args[3])
+    elif "accumulate" in node.kwargs:
+        accumulate = bool(node.kwargs["accumulate"])
+
     # Create index string from the indices list
     index_strs = []
     for index in indices:
@@ -49,7 +63,20 @@ def index_put_default(node: fx.Node, computation_node: ComputationNode) -> None:
         target=node.name, func_name="copy", args=[source.name]
     )
 
-    # Step 2: Create the indexing assignment
-    ast_block.add_subscript_assignment(
-        lhs_name=node.name, rhs_name=value.name, indices=index_strs, lhs_is_indexed=True
-    )
+    # Step 2: Apply indexed update
+    if accumulate:
+        # For index_put(..., accumulate=True), emit np.add.at(dst, index, value)
+        # instead of plain indexed assignment to preserve scatter-add semantics.
+        if index_strs and index_strs[0] and all(s == "" for s in index_strs[1:]):
+            # Common embedding-backward pattern: add along leading axis.
+            index_expr = index_strs[0]
+        else:
+            tuple_parts = ["slice(None)" if s == "" else s for s in index_strs]
+            index_expr = f"({', '.join(tuple_parts)})"
+        ast_block.add_statement(
+            ast.parse(f"np.add.at({node.name}, {index_expr}, {value.name})").body[0]
+        )
+    else:
+        ast_block.add_subscript_assignment(
+            lhs_name=node.name, rhs_name=value.name, indices=index_strs, lhs_is_indexed=True
+        )

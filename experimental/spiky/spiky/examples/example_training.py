@@ -1,10 +1,11 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Training example using the spiky backend with dynamic shapes.
+"""Training example using the spiky backend with explicit bucket sizes.
 
 Trains a small MLP for several steps with varying batch sizes on Neuron
-hardware and compares with eager CPU results.
+hardware and compares with eager CPU results. Uses explicit bucket sizes
+via torch.compile options instead of relying on auto-inferred buckets.
 
 Usage:
     cd nkipy/
@@ -15,7 +16,12 @@ import copy
 
 import torch
 import torch.nn as nn
-from spiky.torch import init_nkipy_backend
+
+try:
+    # Prefer spiky backend init (registers torch.compile backend "nkipy").
+    from spiky.torch.backend import init_nkipy_backend
+except Exception:
+    from spiky.torch import init_nkipy_backend
 
 torch.manual_seed(0)
 
@@ -33,12 +39,17 @@ ref_model = copy.deepcopy(model)
 ref_opt = torch.optim.SGD(ref_model.parameters(), lr=0.01)
 loss_fn = nn.MSELoss()
 
-# Compiled (NKIPy) with dynamic shapes
+# Compiled (NKIPy) with explicit bucket sizes for the batch dimension.
+# Buckets [4, 8, 16] cover all batch sizes used below. Inputs are padded
+# to the nearest bucket size before execution on device.
 comp_model = copy.deepcopy(model).to("nkipy")
 comp_opt = torch.optim.SGD(comp_model.parameters(), lr=0.01, foreach=False)
 
 
-@torch.compile(backend="nkipy", fullgraph=True, dynamic=True)
+@torch.compile(
+    backend="nkipy", fullgraph=True, dynamic=True,
+    options={"buckets": [4, 8, 16]},
+)
 def forward_with_loss(m, x, target):
     out = m(x)
     loss = loss_fn(out, target)
@@ -47,8 +58,9 @@ def forward_with_loss(m, x, target):
 
 compiled_opt_step = torch.compile(comp_opt.step, backend="nkipy")
 
-# Train with varying batch sizes
-batch_sizes = [4, 8, 4, 16, 8]
+# Train with varying batch sizes that trigger padding to the nearest
+# explicit bucket (e.g. 5→8, 7→8, 10→16, 13→16).
+batch_sizes = [5, 7, 5, 13, 10]
 for step, batch_size in enumerate(batch_sizes):
     torch.manual_seed(step)
     x = torch.randn(batch_size, 32)

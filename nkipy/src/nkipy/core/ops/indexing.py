@@ -353,7 +353,7 @@ put_along_axis = Op("put_along_axis")
 
 
 @put_along_axis.impl("hlo")
-def _put_along_axis_hlo(x, indices, values, axis):
+def _put_along_axis_hlo(x, indices, values, axis, update_computation="assign"):
     """Put values into the destination array by matching 1d index and data slices."""
     from nkipy.core.backend.hlo import HLOOp, as_hlo_tensor, get_hlo_context
     from nkipy.core.tensor import NKIPyTensorRef
@@ -397,6 +397,22 @@ def _put_along_axis_hlo(x, indices, values, axis):
             "put_along_axis only supports TensorRef or np.ndarray as indices!"
         )
 
+    # Scatter indices should be int32 for Neuron runtime compatibility.
+    if indices_tensor.dtype != np.dtype(np.int32):
+        indices_tensor = ctx.build_op(
+            "convert", [indices_tensor], indices_tensor.shape, np.dtype(np.int32)
+        )
+
+    # Use explicit index-vector dimension (trailing size-1 dim) for scatter.
+    # This avoids relying on implicit scalar index-vector semantics.
+    scatter_index_prefix_rank = len(indices_tensor.shape)
+    indices_tensor = ctx.build_op(
+        "reshape",
+        [indices_tensor],
+        tuple(indices_tensor.shape) + (1,),
+        np.dtype(np.int32),
+    )
+
     # Handle values
     if np.isscalar(values):
         scalar_tensor = as_hlo_tensor(ctx, values, x.dtype)
@@ -433,11 +449,24 @@ def _put_along_axis_hlo(x, indices, values, axis):
             "put_along_axis only supports scalar, TensorRef, or np.ndarray as values!"
         )
 
-    # Configure scatter dimension numbers
-    update_window_dims = [i for i in range(len(x_copy.shape)) if i != axis]
+    # Configure scatter dimension numbers.
+    # The leading dims of values align with scatter-index dims; trailing dims are
+    # update-window dims (e.g. indices[B,T], values[B,T,C] -> update_window_dims=[2]).
+    indices_rank = scatter_index_prefix_rank
+    values_rank = len(values_tensor.shape)
+    if values_rank < indices_rank:
+        raise ValueError(
+            f"values rank ({values_rank}) must be >= indices rank ({indices_rank})"
+        )
+    update_window_dims = list(range(indices_rank, values_rank))
     inserted_window_dims = [axis]
     scatter_dims_to_operand_dims = [axis]
-    index_vector_dim = len(indices_tensor.shape)
+    index_vector_dim = indices_rank
+
+    if update_computation not in {"assign", "add"}:
+        raise ValueError(
+            f"Unsupported update_computation for put_along_axis: {update_computation}"
+        )
 
     scattered_tensor = ctx.build_op(
         "scatter",
@@ -449,7 +478,7 @@ def _put_along_axis_hlo(x, indices, values, axis):
             "inserted_window_dims": inserted_window_dims,
             "scatter_dims_to_operand_dims": scatter_dims_to_operand_dims,
             "index_vector_dim": index_vector_dim,
-            "update_computation": "assign",
+            "update_computation": update_computation,
             "indices_are_sorted": False,
             "unique_indices": False,
         },

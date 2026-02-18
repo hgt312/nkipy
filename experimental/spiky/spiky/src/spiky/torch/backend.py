@@ -24,6 +24,7 @@ from torch._dynamo.backends.registry import register_backend
 from torch._functorch._aot_autograd.utils import make_boxed_func
 from torch._functorch.aot_autograd import aot_module_simplified
 from torch._inductor.utils import InputType
+from torch.fx.experimental.symbolic_shapes import hint_int
 
 from spiky.device.init import nkipy_close, nkipy_init
 from spiky.runtime.parallel import in_parallel_compile_context
@@ -228,11 +229,11 @@ class CompiledWrapper(torch.nn.Module):
         kernel = self._handle
         if kernel.on_device:
             if in_parallel_compile_context():
-                kernel._save_arg_shape_dtype(args)
+                kernel._save_arg_shape_dtype(kernel._select_active_args(args))
                 return kernel._generate_dummy_outputs(args[0].device)
             if self._callable is None:
                 self._create_static_callable(kernel, args)
-            return self._callable(*args)
+            return self._callable(*kernel._select_active_args(args))
         else:
             return kernel._execute_on_host(*args)
 
@@ -244,15 +245,32 @@ class CompiledWrapper(torch.nn.Module):
         _kernel_dir = kernel.kernel_paths["kernel_dir"]
         _alias_map = kernel.alias_map
         _non_tensor_outputs = kernel.non_tensor_outputs
-        _args = args
+        _args = tuple(kernel._select_active_args(args))
 
         def static_compiler_fn(bucket_size: int):
+            if os.environ.get("SPIKY_DEBUG_STATIC_ARGS", "0") == "1":
+                for idx, arg in enumerate(_args):
+                    if isinstance(arg, torch.Tensor):
+                        logger.info(
+                            "[static-compile-arg] idx=%d shape=%s dtype=%s device=%s",
+                            idx,
+                            tuple(arg.shape),
+                            arg.dtype,
+                            arg.device,
+                        )
+                    else:
+                        logger.info(
+                            "[static-compile-arg] idx=%d scalar=%r type=%s",
+                            idx,
+                            arg,
+                            type(arg).__name__,
+                        )
             neff_path, io_specs = compile_model(
                 nkipy_func=_nkipy_func,
                 args=_args,
                 kernel_dir=_kernel_dir,
             )
-            return str(neff_path), _alias_map, _non_tensor_outputs
+            return str(neff_path), _alias_map, _non_tensor_outputs, io_specs
 
         self._callable = NKIPyCallable(
             config=CallableConfig(
@@ -273,15 +291,20 @@ class CompiledWrapper(torch.nn.Module):
         )
 
 
-def _has_dynamic_dims(example_inputs: Sequence) -> bool:
+def _has_dynamic_dims(example_inputs: Sequence, gm=None) -> bool:
     """Check if any input has symbolic/dynamic dimensions.
 
     Detects dynamic dimensions via:
+    - torch.SymInt values in example_inputs (e.g. backward graph symint args)
     - torch.SymInt in tensor shapes
     - _dynamo_dynamic_indices attribute
     - _dynamo_weak_dynamic_indices attribute
+    - FX placeholder metadata (graph-based fallback for backward graphs where
+      example_inputs are concrete but placeholder meta retains SymInt info)
     """
     for inp in example_inputs:
+        if isinstance(inp, torch.SymInt):
+            return True
         if not hasattr(inp, "shape"):
             continue
         # Check for SymInt in shape
@@ -293,6 +316,19 @@ def _has_dynamic_dims(example_inputs: Sequence) -> bool:
             return True
         if getattr(inp, "_dynamo_weak_dynamic_indices", None):
             return True
+    # Graph-based fallback: backward graphs from AOT autograd may have
+    # concrete example_inputs but symbolic FX placeholder metadata.
+    if gm is not None:
+        for node in gm.graph.nodes:
+            if node.op != "placeholder":
+                continue
+            val = node.meta.get("val")
+            if isinstance(val, torch.SymInt):
+                return True
+            if isinstance(val, torch.Tensor):
+                for dim in val.shape:
+                    if isinstance(dim, torch.SymInt):
+                        return True
     return False
 
 
@@ -314,6 +350,12 @@ def _create_spiky_callable(
     Returns:
         NKIPyCallable instance, or None if routing should fall back to default path
     """
+    def _safe_int(v):
+        """Extract concrete int from SymInt without specializing the shape env."""
+        if isinstance(v, torch.SymInt):
+            return hint_int(v)
+        return int(v)
+
     try:
         from spiky.callable import CallableConfig, NKIPyCallable
         from spiky.utils.dynamic_shapes import discover_dynamic_specs, infer_buckets
@@ -359,24 +401,82 @@ def _create_spiky_callable(
     # SymInt entries get type "symint"; regular scalars preserve their value.
     input_metadata = []
     symint_indices = []
+    dynamic_seed_values = set()
+    for spec in dynamic_specs.values():
+        try:
+            dyn_inp = example_inputs[spec.arg_idx]
+            if isinstance(dyn_inp, torch.Tensor) and len(dyn_inp.shape) > spec.dim_idx:
+                dynamic_seed_values.add(_safe_int(dyn_inp.shape[spec.dim_idx]))
+        except Exception:
+            pass
+
+    # Scan graph placeholders to identify indices that are SymInt in FX
+    # metadata. Backward graphs from AOT autograd may pass concrete int
+    # values as example_inputs even though the FX placeholder is symbolic.
+    graph_symint_indices: set = set()
+    if gm is not None:
+        ph_idx = 0
+        for node in gm.graph.nodes:
+            if node.op != "placeholder":
+                continue
+            val = node.meta.get("val")
+            if isinstance(val, torch.SymInt):
+                graph_symint_indices.add(ph_idx)
+            ph_idx += 1
+
     for i, inp in enumerate(example_inputs):
         if isinstance(inp, torch.Tensor):
             shape = []
             for dim_size in inp.shape:
-                shape.append(int(dim_size))
+                shape.append(_safe_int(dim_size))
             input_metadata.append(
                 {
                     "shape": tuple(shape),
                     "dtype": inp.dtype,
                     "is_floating_point": inp.is_floating_point(),
+                    "device": inp.device,
                 }
             )
         elif isinstance(inp, torch.SymInt):
-            input_metadata.append({"type": "symint"})
+            symint_value = _safe_int(inp)
+            input_metadata.append(
+                {
+                    "type": "symint",
+                    "value": symint_value,
+                    # Heuristic: SymInt values matching dynamic tensor extents
+                    # should follow bucket_size; others stay concrete.
+                    "is_dynamic": symint_value in dynamic_seed_values,
+                }
+            )
+            symint_indices.append(i)
+        elif i in graph_symint_indices:
+            # Plain int that corresponds to a SymInt FX placeholder
+            # (backward graph with concrete example_inputs).
+            symint_value = int(inp) if isinstance(inp, int) else inp
+            input_metadata.append(
+                {
+                    "type": "symint",
+                    "value": symint_value,
+                    "is_dynamic": (
+                        isinstance(inp, int)
+                        and not isinstance(inp, bool)
+                        and int(inp) in dynamic_seed_values
+                    ),
+                }
+            )
             symint_indices.append(i)
         else:
-            # Regular scalar (int, float, bool) — preserve concrete value
-            input_metadata.append({"type": "scalar", "value": inp})
+            # Regular scalar (int, float, bool).
+            # Heuristic: integer scalars matching the dynamic seed extent
+            # should track bucket_size, same as dynamic SymInt values.
+            is_dynamic_scalar = (
+                isinstance(inp, int)
+                and not isinstance(inp, bool)
+                and int(inp) in dynamic_seed_values
+            )
+            input_metadata.append(
+                {"type": "scalar", "value": inp, "is_dynamic": is_dynamic_scalar}
+            )
 
     # Build mapping from arg_idx to dynamic dim
     dynamic_arg_to_dim = {spec.arg_idx: spec.dim_idx for spec in dynamic_specs.values()}
@@ -404,34 +504,64 @@ def _create_spiky_callable(
                 isinstance(meta, dict) and meta.get("type") == "symint"
             )
             if is_symint:
-                # SymInt entry — provide bucket_size as concrete value
-                concrete_inputs.append(bucket_size)
+                # SymInt entry:
+                # - dynamic SymInts follow bucket_size
+                # - static SymInts keep their original concrete value
+                if isinstance(meta, dict):
+                    symint_value = int(meta.get("value", bucket_size))
+                    if meta.get("is_dynamic", False):
+                        concrete_inputs.append(bucket_size)
+                    else:
+                        concrete_inputs.append(symint_value)
+                else:
+                    concrete_inputs.append(bucket_size)
                 symint_indices.append(i)
                 continue
 
             if isinstance(meta, dict) and meta.get("type") == "scalar":
-                # Regular scalar — preserve original value
-                concrete_inputs.append(meta["value"])
+                # Dynamic scalar extents should follow bucket_size.
+                if meta.get("is_dynamic", False):
+                    concrete_inputs.append(bucket_size)
+                else:
+                    concrete_inputs.append(meta["value"])
                 continue
 
             shape = list(meta["shape"])
             dtype = meta["dtype"]
+            device = meta.get("device", None)
 
             if i in dynamic_arg_to_dim:
                 dim = dynamic_arg_to_dim[i]
                 if len(shape) > dim:
                     shape[dim] = bucket_size
 
-            if meta["is_floating_point"]:
-                concrete_inputs.append(torch.randn(shape, dtype=dtype))
-            elif dtype == torch.bool:
-                concrete_inputs.append(torch.zeros(shape, dtype=torch.bool))
-            else:
-                concrete_inputs.append(torch.randint(0, 100, shape, dtype=dtype))
+            # Also replace any other dimensions matching the dynamic seed
+            # extent.  Backward graphs from AOT autograd can have inputs with
+            # multiple dynamic dimensions (e.g. attention weight matrices with
+            # shape (B, H, T, T) where both T dims are symbolic), but
+            # dynamic_arg_to_dim only captures one dim per arg.  This ensures
+            # all such dimensions are resized consistently.
+            for d_idx in range(len(shape)):
+                if shape[d_idx] in dynamic_seed_values:
+                    shape[d_idx] = bucket_size
 
-        # Re-trace with make_fx to get a graph with concrete shapes
+            if meta["is_floating_point"]:
+                concrete_inputs.append(torch.randn(shape, dtype=dtype, device=device))
+            elif dtype == torch.bool:
+                concrete_inputs.append(torch.zeros(shape, dtype=torch.bool, device=device))
+            else:
+                concrete_inputs.append(torch.randint(0, 100, shape, dtype=dtype, device=device))
+
+        # Re-trace with make_fx to get a graph with concrete shapes.
+        # Use fake tracing to avoid executing decomposed ops on real nkipy
+        # tensors during tracing (which can trigger CPU fallback copies on
+        # non-contiguous views, e.g. permute -> mul in SDPA decomposition).
         with torch.no_grad():
-            concrete_gm = make_fx(gm, decomposition_table=core_aten_decompositions())(
+            concrete_gm = make_fx(
+                gm,
+                decomposition_table=core_aten_decompositions(),
+                tracing_mode="fake",
+            )(
                 *concrete_inputs
             )
 
@@ -474,10 +604,10 @@ def _create_spiky_callable(
         # Force NEFF compilation
         neff_path, io_specs = compile_model(
             nkipy_func=kernel.nkipy_func,
-            args=tensor_inputs,
+            args=kernel._select_active_args(tensor_inputs),
             kernel_dir=kernel.kernel_paths["kernel_dir"],
         )
-        return str(neff_path), kernel.alias_map, kernel.non_tensor_outputs
+        return str(neff_path), kernel.alias_map, kernel.non_tensor_outputs, io_specs
 
     # Determine output layout and derive unpad_outputs consistently.
     # When output_layout is "padded", the engine must NOT unpad so that
@@ -520,7 +650,8 @@ def _create_spiky_callable(
         world_size=config.world_size,
     )
 
-    return NKIPyCallable(config=callable_config, compiler_fn=compiler_fn)
+    callable = NKIPyCallable(config=callable_config, compiler_fn=compiler_fn)
+    return callable
 
 
 def nkipy_backend_fn_decomposed(
@@ -541,7 +672,7 @@ def nkipy_backend_fn_decomposed(
     config = get_nkipy_backend_config()
 
     # Route to spiky for dynamic shapes
-    if config and _has_dynamic_dims(example_inputs):
+    if config and _has_dynamic_dims(example_inputs, gm=gm):
         callable = _create_spiky_callable(gm, example_inputs, options)
         if callable is not None:
             return make_boxed_func(callable)
